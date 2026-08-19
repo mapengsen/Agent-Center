@@ -1,6 +1,6 @@
 {
   "name": "codex-claude-agent-status",
-  "displayName": "Agent Status",
+  "displayName": "Agent Status for Codex & Claude",
   "description": "Codex and Claude usage quotas in the VS Code status bar, requested from the current local or remote workspace environment.",
   "version": "0.1.0",
   "publisher": "pengsen",
