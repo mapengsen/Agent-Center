@@ -6,12 +6,12 @@ Agent Status 用于在 VS Code 状态栏中显示 Codex 和 Claude 的使用额�
 
 **GitHub**: [github.com/mapengsen/Agent-Status](https://github.com/mapengsen/Agent-Status)
 
-**Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.agent-status)
+**Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
 
 **我的所有插件推荐：**
 
 1. **Notifyer Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion)
-2. **Agent Status**：[marketplace.visualstudio.com/items?itemName=pengsen.agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.agent-status)
+2. **Agent Status**：[marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
 
 ## 主要功能
 

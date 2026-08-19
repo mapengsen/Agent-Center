@@ -6,7 +6,12 @@ Agent Status displays Codex and Claude usage quotas directly in the VS Code stat
 
 **GitHub**: [github.com/mapengsen/Agent-Status](https://github.com/mapengsen/Agent-Status)
 
-**Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.agent-status)
+**Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
+
+**All My Plugin Recommendations:**
+
+1. **Notifyer Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion)
+2. **Agent Status**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
 
 ## Features
 
@@ -26,9 +31,3 @@ Agent Status displays Codex and Claude usage quotas directly in the VS Code stat
 
 - Initial independent release extracted from Notifyer.
 - Codex and Claude credential reads, network requests, status items, tooltips, refresh animation, and scheduling now run entirely in the current workspace environment.
-
-## My Other Plugin Recommendations
-
-**GitHub**: [github.com/mapengsen/Notifyer](https://github.com/mapengsen/Notifyer)
-
-**Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion)
