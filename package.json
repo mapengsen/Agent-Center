@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "publisher": "pengsen",
   "license": "MIT",
-  "icon": "resources/images/Agent Status.png",
+  "icon": "resources/images/agent-status.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/mapengsen/Agent-Status.git"
