@@ -1,0 +1,167 @@
+{
+  "name": "agent-status",
+  "displayName": "Agent Status",
+  "description": "Codex and Claude usage quotas in the VS Code status bar, requested from the current local or remote workspace environment.",
+  "version": "0.1.0",
+  "publisher": "pengsen",
+  "license": "MIT",
+  "icon": "resources/images/Agent Status.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mapengsen/Agent-Status.git"
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "AI",
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "agent",
+    "stats",
+    "codex",
+    "claude",
+    "openai",
+    "anthropic",
+    "quota",
+    "usage"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "icons": {
+      "agent-status-codex-blossom": {
+        "description": "Codex blossom status bar icon",
+        "default": {
+          "fontPath": "resources/codex-icon.woff",
+          "fontCharacter": "\\e900"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "agentStatus.refreshCodexUsage",
+        "title": "Agent Status: Refresh Codex Usage"
+      },
+      {
+        "command": "agentStatus.chooseCodexUsageDisplayMode",
+        "title": "Agent Status: Choose Codex Usage Display"
+      },
+      {
+        "command": "agentStatus.refreshClaudeUsage",
+        "title": "Agent Status: Refresh Claude Usage"
+      },
+      {
+        "command": "agentStatus.chooseClaudeUsageDisplayMode",
+        "title": "Agent Status: Choose Claude Usage Display"
+      },
+      {
+        "command": "agentStatus.showDiagnostics",
+        "title": "Agent Status: Show Diagnostics"
+      },
+      {
+        "command": "agentStatus.openSettings",
+        "title": "Agent Status: Open Settings"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Status",
+      "properties": {
+        "agentStatus.codex.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "在状态栏显示当前环境的 Codex 额度。"
+        },
+        "agentStatus.codex.credentialsPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "当前环境中的 Codex auth.json 路径。留空时读取 CODEX_HOME/auth.json 或 ~/.codex/auth.json。"
+        },
+        "agentStatus.codex.usageUpdateIntervalSeconds": {
+          "type": "number",
+          "default": 600,
+          "minimum": 30,
+          "description": "Codex 正常阶段的刷新间隔（秒），默认 10 分钟。启动后会先立即刷新，并在前 3 分钟每 30 秒刷新一次（共 6 次）。"
+        },
+        "agentStatus.codex.usageDisplayMode": {
+          "type": "string",
+          "enum": [
+            "remaining",
+            "used"
+          ],
+          "enumDescriptions": [
+            "显示剩余额度（默认）。",
+            "显示已使用额度。"
+          ],
+          "default": "remaining",
+          "description": "选择 Codex 状态栏显示剩余百分比还是已使用百分比。"
+        },
+        "agentStatus.codex.proxyUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "当前环境请求 Codex 额度时使用的 HTTP/HTTPS 代理，例如 http://127.0.0.1:7890。留空时保留环境代理行为。"
+        },
+        "agentStatus.claude.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "在状态栏显示当前环境的 Claude 额度。"
+        },
+        "agentStatus.claude.credentialsPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "当前环境中的 Claude .credentials.json 路径。留空时读取 CLAUDE_CONFIG_DIR/.credentials.json 或 ~/.claude/.credentials.json。"
+        },
+        "agentStatus.claude.usageUpdateIntervalSeconds": {
+          "type": "number",
+          "default": 600,
+          "minimum": 30,
+          "description": "Claude 正常阶段的刷新间隔（秒），默认 10 分钟。启动后会先立即刷新，并在前 3 分钟每 30 秒刷新一次（共 6 次）。"
+        },
+        "agentStatus.claude.usageDisplayMode": {
+          "type": "string",
+          "enum": [
+            "remaining",
+            "used"
+          ],
+          "enumDescriptions": [
+            "显示剩余额度（默认）。",
+            "显示已使用额度。"
+          ],
+          "default": "remaining",
+          "description": "选择 Claude 状态栏显示剩余百分比还是已使用百分比。"
+        },
+        "agentStatus.claude.proxyUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "当前环境请求 Claude 额度时使用的 HTTP/HTTPS 代理，例如 http://127.0.0.1:7890。留空时保留环境代理行为。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test:unit": "npm run compile && node --test out/test/core.test.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "npm run compile && vsce package"
+  },
+  "dependencies": {
+    "axios": "^1.7.9"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.0",
+    "@types/vscode": "1.93.0",
+    "@vscode/vsce": "3.9.2",
+    "typescript": "^5.5.4"
+  }
+}
