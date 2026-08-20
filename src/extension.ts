@@ -11,12 +11,12 @@ export function activate(context: vscode.ExtensionContext): void {
     codexUsage,
     claudeUsage,
     diagnostics,
-    vscode.commands.registerCommand("agentStatus.refreshCodexUsage", () => codexUsage.refresh()),
+    vscode.commands.registerCommand("agentStatus.refreshCodexUsage", () => codexUsage.refresh("manual")),
     vscode.commands.registerCommand(
       "agentStatus.chooseCodexUsageDisplayMode",
       () => codexUsage.chooseDisplayMode(),
     ),
-    vscode.commands.registerCommand("agentStatus.refreshClaudeUsage", () => claudeUsage.refresh()),
+    vscode.commands.registerCommand("agentStatus.refreshClaudeUsage", () => claudeUsage.refresh("manual")),
     vscode.commands.registerCommand(
       "agentStatus.chooseClaudeUsageDisplayMode",
       () => claudeUsage.chooseDisplayMode(),

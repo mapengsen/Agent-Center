@@ -66,25 +66,47 @@ export interface QuotaStatusPresentation {
   statusText: string;
 }
 
-export const STARTUP_USAGE_REFRESH_COUNT = 6;
-export const STARTUP_USAGE_REFRESH_INTERVAL_SECONDS = 30;
-export const DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS = 10 * 60;
+export const STARTUP_USAGE_REFRESH_COUNT = 3;
+export const STARTUP_USAGE_REFRESH_INTERVAL_SECONDS = 60;
+export const REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS = 30;
+export const MAX_REGULAR_USAGE_REFRESH_ATTEMPTS = 5;
+export const DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS = 15 * 60;
 
 export class UsageRefreshCadence {
   private remainingStartupRefreshes = STARTUP_USAGE_REFRESH_COUNT;
+  private regularRefreshAttempts = 0;
 
   public get startupRefreshesRemaining(): number {
     return this.remainingStartupRefreshes;
   }
 
-  public getDelaySeconds(regularIntervalSeconds: number): number {
-    return this.remainingStartupRefreshes > 0
-      ? STARTUP_USAGE_REFRESH_INTERVAL_SECONDS
-      : Math.max(STARTUP_USAGE_REFRESH_INTERVAL_SECONDS, regularIntervalSeconds);
+  public get regularRefreshAttemptsCount(): number {
+    return this.regularRefreshAttempts;
   }
 
-  public consumeScheduledRefresh(): void {
-    if (this.remainingStartupRefreshes > 0) this.remainingStartupRefreshes -= 1;
+  public getDelaySeconds(regularIntervalSeconds: number): number {
+    if (this.remainingStartupRefreshes > 0) return STARTUP_USAGE_REFRESH_INTERVAL_SECONDS;
+    if (this.regularRefreshAttempts > 0 && this.regularRefreshAttempts < MAX_REGULAR_USAGE_REFRESH_ATTEMPTS) {
+      return REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS;
+    }
+    return Math.max(REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS, regularIntervalSeconds);
+  }
+
+  public consumeScheduledRefresh(): boolean {
+    if (this.remainingStartupRefreshes <= 0) return false;
+    this.remainingStartupRefreshes -= 1;
+    return true;
+  }
+
+  public recordRegularRefreshResult(successful: boolean): void {
+    if (successful) {
+      this.regularRefreshAttempts = 0;
+      return;
+    }
+    this.regularRefreshAttempts = Math.min(
+      MAX_REGULAR_USAGE_REFRESH_ATTEMPTS,
+      this.regularRefreshAttempts + 1,
+    );
   }
 }
 

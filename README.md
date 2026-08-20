@@ -1,6 +1,6 @@
 # Agent Status
 
-Language: <a href="./README.md">English (default)</a> | <a href="./README.zh-CN.md">简体中文</a>
+Language: <a href="https://github.com/mapengsen/Agent-Status/tree/main">English (default)</a> | <a href="https://github.com/mapengsen/Agent-Status/blob/main/README.zh-CN.md">简体中文</a>
 
 Agent Status displays Codex and Claude usage quotas directly in the VS Code status bar.
 
@@ -20,8 +20,8 @@ Agent Status displays Codex and Claude usage quotas directly in the VS Code stat
 - Claude 5-hour, 7-day, Opus, and Sonnet window details.
 - Hover descriptions explaining the percentage, represented window, reset time, and last update. (Status-bar reset times use the time zone of the environment where Agent Status is running. If a remote server and Windows use different time zones, the displayed clock time may differ.)
 - Remaining/used display modes, with click-to-refresh support directly from the status bar.
-- An animated refresh indicator during startup, scheduled, and manual requests.
-- An immediate startup refresh followed by a refresh every 30 seconds for a total of six times, then the regular default interval of 10 minutes.
+- An animated refresh indicator during manual requests only; automatic refreshes keep the normal status display.
+- An immediate startup refresh followed by three automatic refreshes at 60-second intervals, then the regular default interval of 15 minutes. Failed regular refreshes retry every 30 seconds, up to five attempts per cycle.
 
 ![alt text](image.png)
 

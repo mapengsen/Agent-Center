@@ -11,6 +11,9 @@ import {
 } from "./core";
 import { fetchClaudeUsage } from "./usageService";
 
+type RefreshTrigger = "automatic" | "manual";
+type RefreshOutcome = "success" | "failure" | "skipped";
+
 export class ClaudeUsageMonitor implements vscode.Disposable {
   private readonly statusBar: vscode.StatusBarItem;
   private timer: NodeJS.Timeout | undefined;
@@ -37,13 +40,13 @@ export class ClaudeUsageMonitor implements vscode.Disposable {
       this.statusBar.hide();
       return;
     }
-    void this.refresh().finally(() => this.scheduleNext());
+    void this.refresh("automatic").finally(() => this.scheduleNext());
   }
 
-  public async refresh(): Promise<void> {
-    if (this.inFlight || !isEnabled()) return;
+  public async refresh(trigger: RefreshTrigger = "automatic"): Promise<RefreshOutcome> {
+    if (this.inFlight || !isEnabled()) return "skipped";
     this.inFlight = true;
-    this.renderRefreshing();
+    if (trigger === "manual") this.renderRefreshing();
     try {
       const result = await fetchClaudeUsage({
         credentialsPath: getProviderSetting("claude", "credentialsPath", "").trim(),
@@ -54,16 +57,18 @@ export class ClaudeUsageMonitor implements vscode.Disposable {
         this.lastError = result.error.message;
         if (result.error.category === "auth") this.renderAuthRequired();
         else this.renderError();
-        return;
+        return "failure";
       }
 
       this.snapshot = result.snapshot;
       this.lastError = "";
       this.renderSnapshot(result.snapshot);
+      return "success";
     } catch (error) {
       this.snapshot = undefined;
       this.lastError = error instanceof Error ? error.message : String(error);
       this.renderError();
+      return "failure";
     } finally {
       this.inFlight = false;
     }
@@ -109,6 +114,7 @@ export class ClaudeUsageMonitor implements vscode.Disposable {
       displayMode: this.displayMode,
       legacyConfigurationUsed: hasLegacyQuotaConfiguration("claude"),
       startupRefreshesRemaining: this.refreshCadence.startupRefreshesRemaining,
+      regularRefreshAttempts: this.refreshCadence.regularRefreshAttemptsCount,
       updatedAt: this.snapshot?.updatedAt.toISOString() ?? "",
       fiveHourRemainingPercent: this.snapshot?.fiveHour?.remainingPercent,
       sevenDayRemainingPercent: this.snapshot?.sevenDay?.remainingPercent,
@@ -130,8 +136,14 @@ export class ClaudeUsageMonitor implements vscode.Disposable {
     );
     const seconds = this.refreshCadence.getDelaySeconds(regularIntervalSeconds);
     this.timer = setTimeout(() => {
-      this.refreshCadence.consumeScheduledRefresh();
-      void this.refresh().finally(() => this.scheduleNext());
+      const isStartupRefresh = this.refreshCadence.consumeScheduledRefresh();
+      void this.refresh("automatic")
+        .then((outcome) => {
+          if (!isStartupRefresh && outcome !== "skipped") {
+            this.refreshCadence.recordRegularRefreshResult(outcome === "success");
+          }
+        })
+        .finally(() => this.scheduleNext());
     }, seconds * 1000);
   }
 

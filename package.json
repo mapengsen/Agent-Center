@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Status for Codex & Claude",
   "description": "Codex and Claude usage quotas in the VS Code status bar, requested from the current local or remote workspace environment.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-status.png",
@@ -87,9 +87,9 @@
         },
         "agentStatus.codex.usageUpdateIntervalSeconds": {
           "type": "number",
-          "default": 600,
+          "default": 900,
           "minimum": 30,
-          "description": "Codex 正常阶段的刷新间隔（秒），默认 10 分钟。启动后会先立即刷新，并在前 3 分钟每 30 秒刷新一次（共 6 次）。"
+          "description": "Codex 正常阶段的刷新间隔（秒），默认 15 分钟。启动后会先立即刷新，并在之后每 60 秒自动刷新 3 次。常规阶段失败时每 30 秒重试，单轮最多 5 次。"
         },
         "agentStatus.codex.usageDisplayMode": {
           "type": "string",
@@ -123,9 +123,9 @@
         },
         "agentStatus.claude.usageUpdateIntervalSeconds": {
           "type": "number",
-          "default": 600,
+          "default": 900,
           "minimum": 30,
-          "description": "Claude 正常阶段的刷新间隔（秒），默认 10 分钟。启动后会先立即刷新，并在前 3 分钟每 30 秒刷新一次（共 6 次）。"
+          "description": "Claude 正常阶段的刷新间隔（秒），默认 15 分钟。启动后会先立即刷新，并在之后每 60 秒自动刷新 3 次。常规阶段失败时每 30 秒重试，单轮最多 5 次。"
         },
         "agentStatus.claude.usageDisplayMode": {
           "type": "string",

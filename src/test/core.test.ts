@@ -9,6 +9,8 @@ import {
   parseCodexAuthData,
   parseCodexUsageResponse,
   resolveCredentialFilePath,
+  MAX_REGULAR_USAGE_REFRESH_ATTEMPTS,
+  REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS,
   STARTUP_USAGE_REFRESH_COUNT,
   STARTUP_USAGE_REFRESH_INTERVAL_SECONDS,
   UsageRefreshCadence,
@@ -30,17 +32,32 @@ test("formats the compact percentage and reset timestamp", () => {
   assert.equal(formatQuotaStatus(25, "used", undefined, referenceTime)?.statusText, "25% used | --");
 });
 
-test("retries every 30 seconds six times before the regular interval", () => {
+test("uses startup cadence and retries failed regular refreshes", () => {
   const cadence = new UsageRefreshCadence();
-  assert.equal(STARTUP_USAGE_REFRESH_COUNT, 6);
-  assert.equal(STARTUP_USAGE_REFRESH_INTERVAL_SECONDS, 30);
-  assert.equal(DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS, 600);
-  for (let remaining = 6; remaining > 0; remaining -= 1) {
+  assert.equal(STARTUP_USAGE_REFRESH_COUNT, 3);
+  assert.equal(STARTUP_USAGE_REFRESH_INTERVAL_SECONDS, 60);
+  assert.equal(REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS, 30);
+  assert.equal(MAX_REGULAR_USAGE_REFRESH_ATTEMPTS, 5);
+  assert.equal(DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS, 900);
+  for (let remaining = 3; remaining > 0; remaining -= 1) {
     assert.equal(cadence.startupRefreshesRemaining, remaining);
-    assert.equal(cadence.getDelaySeconds(600), 30);
-    cadence.consumeScheduledRefresh();
+    assert.equal(cadence.getDelaySeconds(900), 60);
+    assert.equal(cadence.consumeScheduledRefresh(), true);
   }
-  assert.equal(cadence.getDelaySeconds(600), 600);
+  assert.equal(cadence.consumeScheduledRefresh(), false);
+  assert.equal(cadence.getDelaySeconds(900), 900);
+
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    cadence.recordRegularRefreshResult(false);
+    assert.equal(cadence.regularRefreshAttemptsCount, attempt);
+    assert.equal(
+      cadence.getDelaySeconds(900),
+      attempt < 5 ? REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS : 900,
+    );
+  }
+  cadence.recordRegularRefreshResult(true);
+  assert.equal(cadence.regularRefreshAttemptsCount, 0);
+  assert.equal(cadence.getDelaySeconds(900), 900);
 });
 
 test("resolves credentials inside the extension host environment", () => {

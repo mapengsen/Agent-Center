@@ -1,6 +1,6 @@
 # Agent Status
 
-语言：<a href="./README.md">English（默认）</a> | <a href="./README.zh-CN.md">简体中文</a>
+语言：<a href="https://github.com/mapengsen/Agent-Status/tree/main">English（默认）</a> | <a href="https://github.com/mapengsen/Agent-Status/blob/main/README.zh-CN.md">简体中文</a>
 
 Agent Status 用于在 VS Code 状态栏中显示 Codex 和 Claude 的使用额度。
 
@@ -20,8 +20,8 @@ Agent Status 用于在 VS Code 状态栏中显示 Codex 和 Claude 的使用额�
 - 显示 Claude 5 小时、7 天、Opus 与 Sonnet 窗口信息。
 - 鼠标悬停时解释百分比、当前代表的窗口、重置时间和最后更新时间(状态栏重置时间使用 Agent Status 运行环境的时区。如果远程服务器和 Windows 时区不同，显示的时钟时间也可能不同。)。
 - 支持剩余/已使用两种显示模式，并可点击状态栏立即刷新。
-- 启动、定时和手动请求期间显示旋转的“刷新中”动画。
-- 启动时立即刷新，随后每 30 秒刷新一次，共 6 次；之后使用默认 10 分钟的常规间隔。
+- 只有手动请求期间显示旋转的“刷新中”动画；自动刷新时保持正常状态显示。
+- 启动时立即刷新，随后每 60 秒自动刷新一次，共 3 次；之后使用默认 15 分钟的常规间隔。常规阶段刷新失败时每 30 秒重试，单轮最多尝试 5 次。
 
 ![alt text](image.png)
 
