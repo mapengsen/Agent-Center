@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.3 - 2026-08-24
+
+### Changed / 变更
+
+- Replaced monochrome Codicons in hover details with a distinct set of colorful emoji markers and added usage-sensitive green, yellow, orange, and red percentage indicators.
+- 将悬浮详情中的单色 Codicon 替换为一套独立的彩色 Emoji，并根据已使用比例增加绿、黄、橙、红动态百分比标记。
+
 ## 0.1.2 - 2026-08-24
 
 ### Changed / 变更

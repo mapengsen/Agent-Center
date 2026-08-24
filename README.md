@@ -18,7 +18,7 @@ Agent Center brings AI coding-agent insights and utilities into VS Code. The cur
 - Compact status text such as `5% left | 8-20 11:24` or `5% used | 8-20 11:24`.
 - Codex short- and long-window details, account email, and plan type.
 - Claude 5-hour, 7-day, Opus, and Sonnet window details.
-- Structured hover details with icons for status meaning, account, plan, usage windows, reset time, last update, and actions. (Status-bar reset times use the time zone of the environment where Agent Center is running. If a remote server and Windows use different time zones, the displayed clock time may differ.)
+- Structured hover details with colorful, category-specific emoji for status meaning, account, plan, usage windows, reset time, last update, and actions. Percentage markers change from green through yellow and orange to red as usage rises. (Status-bar reset times use the time zone of the environment where Agent Center is running. If a remote server and Windows use different time zones, the displayed clock time may differ.)
 - Remaining/used display modes, with click-to-refresh support directly from the status bar.
 - An animated refresh indicator during manual requests only; automatic refreshes keep the normal status display.
 - An immediate startup refresh followed by three automatic refreshes at 60-second intervals, then the regular default interval of 15 minutes. Failed regular refreshes retry every 30 seconds, up to five attempts per cycle.
@@ -26,6 +26,11 @@ Agent Center brings AI coding-agent insights and utilities into VS Code. The cur
 ![Agent Center status bar preview](image.png)
 
 ## Changelog
+
+### 0.1.3 - 2026-08-24
+
+- Replaced monochrome hover Codicons with a distinct set of colorful emoji markers.
+- Added green, yellow, orange, and red percentage indicators based on used quota.
 
 ### 0.1.2 - 2026-08-24
 

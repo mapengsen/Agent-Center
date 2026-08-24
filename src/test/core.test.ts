@@ -15,6 +15,7 @@ import {
   STARTUP_USAGE_REFRESH_INTERVAL_SECONDS,
   UsageRefreshCadence,
 } from "../core";
+import { getUsageHealthEmoji } from "../tooltipPresentation";
 
 function jwt(payload: Record<string, unknown>): string {
   return `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
@@ -30,6 +31,14 @@ test("formats the compact percentage and reset timestamp", () => {
     statusText: "5% left | 8-20 11:24",
   });
   assert.equal(formatQuotaStatus(25, "used", undefined, referenceTime)?.statusText, "25% used | --");
+});
+
+test("uses distinct health colors for usage thresholds", () => {
+  assert.equal(getUsageHealthEmoji(0), "💚");
+  assert.equal(getUsageHealthEmoji(60), "💛");
+  assert.equal(getUsageHealthEmoji(80), "🧡");
+  assert.equal(getUsageHealthEmoji(95), "❤️");
+  assert.equal(getUsageHealthEmoji(200), "❤️");
 });
 
 test("uses startup cadence and retries failed regular refreshes", () => {

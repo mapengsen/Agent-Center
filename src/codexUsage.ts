@@ -10,6 +10,11 @@ import {
   type UsageDisplayMode,
 } from "./core";
 import { fetchCodexUsage } from "./usageService";
+import {
+  getUsageHealthEmoji,
+  TOOLTIP_EMOJI,
+  USAGE_HEALTH_LEGEND,
+} from "./tooltipPresentation";
 
 type RefreshTrigger = "automatic" | "manual";
 type RefreshOutcome = "success" | "failure" | "skipped";
@@ -32,7 +37,7 @@ export class CodexUsageMonitor implements vscode.Disposable {
     this.statusBar.name = "Agent Center: Codex quota";
     this.statusBar.command = "agentStatus.refreshCodexUsage";
     this.statusBar.text = "$(agent-status-codex-blossom) Codex --";
-    this.statusBar.tooltip = "Codex 额度正在加载…";
+    this.statusBar.tooltip = `${TOOLTIP_EMOJI.loading} Codex 额度正在加载…`;
   }
 
   public start(): void {
@@ -167,21 +172,21 @@ export class CodexUsageMonitor implements vscode.Disposable {
     this.statusBar.show();
     this.statusBar.color = undefined;
     this.statusBar.backgroundColor = undefined;
-    this.statusBar.tooltip = "正在当前工作区环境中刷新 Codex 额度…";
+    this.statusBar.tooltip = `${TOOLTIP_EMOJI.refreshing} 正在当前工作区环境中刷新 Codex 额度…`;
   }
 
   private renderAuthRequired(): void {
     this.statusBar.text = "$(agent-status-codex-blossom) Codex --";
     this.statusBar.hide();
     this.statusBar.color = new vscode.ThemeColor("editorWarning.foreground");
-    this.statusBar.tooltip = "当前工作区环境中未找到或无法使用 Codex 登录信息。请在该环境运行 codex login。";
+    this.statusBar.tooltip = `${TOOLTIP_EMOJI.auth} 当前工作区环境中未找到或无法使用 Codex 登录信息。请在该环境运行 codex login。`;
   }
 
   private renderError(): void {
     this.statusBar.text = "$(agent-status-codex-blossom) Codex ?";
     this.statusBar.show();
     this.statusBar.color = new vscode.ThemeColor("editorWarning.foreground");
-    this.statusBar.tooltip = `无法读取 Codex 额度。点击刷新重试。\n\n${this.lastError}`;
+    this.statusBar.tooltip = `${TOOLTIP_EMOJI.error} 无法读取 Codex 额度。点击刷新重试。\n\n${this.lastError}`;
   }
 }
 
@@ -189,17 +194,17 @@ function buildTooltip(snapshot: CodexUsageSnapshot, displayMode: UsageDisplayMod
   const tooltip = new vscode.MarkdownString(undefined, true);
   tooltip.isTrusted = true;
   const displayLabel = displayMode === "remaining" ? "剩余" : "已使用";
-  tooltip.appendMarkdown(`### $(agent-status-codex-blossom) Codex ${displayLabel}额度\n\n`);
+  tooltip.appendMarkdown(`### ${TOOLTIP_EMOJI.codex} Codex ${displayLabel}额度\n\n`);
   const primary = snapshot.primary ?? snapshot.secondary;
   const primaryLabel = snapshot.primary ? "短窗口" : "长窗口";
   if (primary) appendStatusMeaning(tooltip, primaryLabel, primary, displayMode, snapshot.updatedAt);
-  tooltip.appendMarkdown(`$(account) **账户**：${escapeMarkdown(snapshot.email)}\n\n`);
-  tooltip.appendMarkdown(`$(credit-card) **套餐**：${escapeMarkdown(snapshot.planType)}\n\n`);
-  tooltip.appendMarkdown("> $(info) 这里显示的是当前时间窗口的百分比，不是绝对请求数或 Token 数。\n\n");
-  appendWindow(tooltip, "clock", "短窗口", snapshot.primary, displayMode);
-  appendWindow(tooltip, "calendar", "长窗口", snapshot.secondary, displayMode);
-  tooltip.appendMarkdown(`$(history) **最后更新**：${snapshot.updatedAt.toLocaleTimeString()}（当前运行环境时区）\n\n`);
-  tooltip.appendMarkdown("$(refresh) [立即刷新](command:agentStatus.refreshCodexUsage) · $(eye) [切换显示](command:agentStatus.chooseCodexUsageDisplayMode) · $(settings-gear) [打开设置](command:agentStatus.openSettings)");
+  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.account} **账户**：${escapeMarkdown(snapshot.email)}\n\n`);
+  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.plan} **套餐**：${escapeMarkdown(snapshot.planType)}\n\n`);
+  tooltip.appendMarkdown(`> ${TOOLTIP_EMOJI.note} 这里显示的是当前时间窗口的百分比，不是绝对请求数或 Token 数。\n\n`);
+  appendWindow(tooltip, TOOLTIP_EMOJI.shortWindow, "短窗口", snapshot.primary, displayMode);
+  appendWindow(tooltip, TOOLTIP_EMOJI.longWindow, "长窗口", snapshot.secondary, displayMode);
+  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.updated} **最后更新**：${snapshot.updatedAt.toLocaleTimeString()}（当前运行环境时区）\n\n`);
+  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.refresh} [立即刷新](command:agentStatus.refreshCodexUsage) · ${TOOLTIP_EMOJI.displayMode} [切换显示](command:agentStatus.chooseCodexUsageDisplayMode) · ${TOOLTIP_EMOJI.settings} [打开设置](command:agentStatus.openSettings)`);
   return tooltip;
 }
 
@@ -223,15 +228,16 @@ function appendStatusMeaning(
   const resetMeaning = presentation.resetDateTime
     ? `当前${windowLabel}的重置时间，按 Agent Center 运行环境的时区显示`
     : `额度接口暂未提供当前${windowLabel}的重置时间`;
-  tooltip.appendMarkdown(`$(layout-statusbar) **状态栏含义**：\`${presentation.statusText}\`\n\n`);
-  tooltip.appendMarkdown(`- $(pie-chart) \`${presentation.percentageText} ${presentation.modeLabel}\`：${percentageMeaning}。\n\n`);
-  tooltip.appendMarkdown(`- $(calendar) \`${presentation.resetDateTime ?? "--"}\`：${resetMeaning}。\n\n`);
-  tooltip.appendMarkdown("> $(info) Codex 状态栏优先展示短窗口；短窗口不可用时才展示长窗口。\n\n");
+  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.statusMeaning} **状态栏含义**：\`${presentation.statusText}\`\n\n`);
+  tooltip.appendMarkdown(`- ${getUsageHealthEmoji(window.usedPercent)} \`${presentation.percentageText} ${presentation.modeLabel}\`：${percentageMeaning}。\n\n`);
+  tooltip.appendMarkdown(`- ${TOOLTIP_EMOJI.reset} \`${presentation.resetDateTime ?? "--"}\`：${resetMeaning}。\n\n`);
+  tooltip.appendMarkdown(`> ${TOOLTIP_EMOJI.colorLegend} 颜色始终按已使用比例：${USAGE_HEALTH_LEGEND}。\n\n`);
+  tooltip.appendMarkdown(`> ${TOOLTIP_EMOJI.note} Codex 状态栏优先展示短窗口；短窗口不可用时才展示长窗口。\n\n`);
 }
 
 function appendWindow(
   tooltip: vscode.MarkdownString,
-  icon: "clock" | "calendar",
+  icon: string,
   label: string,
   window: CodexUsageWindow | undefined,
   displayMode: UsageDisplayMode,
@@ -249,7 +255,7 @@ function appendWindow(
   const otherLabel = displayMode === "remaining" ? "已使用" : "剩余";
   const displayPercent = getDisplayPercent(window, displayMode);
   const otherPercent = getDisplayPercent(window, displayMode === "remaining" ? "used" : "remaining");
-  tooltip.appendMarkdown(`$(${icon}) **${label}（${duration}）**：${displayLabel} **${displayPercent.toFixed(1)}%**，${otherLabel} ${otherPercent.toFixed(1)}%，${reset} 后重置。\n\n`);
+  tooltip.appendMarkdown(`${icon} **${label}（${duration}）**：${displayLabel} **${displayPercent.toFixed(1)}%**，${otherLabel} ${otherPercent.toFixed(1)}%，${reset} 后重置。\n\n`);
 }
 
 function isEnabled(): boolean {

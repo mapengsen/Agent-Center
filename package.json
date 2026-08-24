@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "AI coding-agent usage, account, and reset details in the VS Code status bar. Currently supports Codex and Claude.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
