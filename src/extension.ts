@@ -5,7 +5,7 @@ import { CodexUsageMonitor } from "./codexUsage";
 export function activate(context: vscode.ExtensionContext): void {
   const codexUsage = new CodexUsageMonitor();
   const claudeUsage = new ClaudeUsageMonitor();
-  const diagnostics = vscode.window.createOutputChannel("Agent Status");
+  const diagnostics = vscode.window.createOutputChannel("Agent Center");
 
   context.subscriptions.push(
     codexUsage,
@@ -22,11 +22,11 @@ export function activate(context: vscode.ExtensionContext): void {
       () => claudeUsage.chooseDisplayMode(),
     ),
     vscode.commands.registerCommand("agentStatus.openSettings", () =>
-      vscode.commands.executeCommand("workbench.action.openSettings", "@ext:pengsen.agent-status"),
+      vscode.commands.executeCommand("workbench.action.openSettings", "@ext:pengsen.codex-claude-agent-status"),
     ),
     vscode.commands.registerCommand("agentStatus.showDiagnostics", () => {
       diagnostics.clear();
-      diagnostics.appendLine("Agent Status diagnostics");
+      diagnostics.appendLine("Agent Center diagnostics");
       diagnostics.appendLine(JSON.stringify({
         extensionHost: vscode.env.remoteName ?? "local",
         codex: codexUsage.getDiagnostics(),

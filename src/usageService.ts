@@ -43,7 +43,7 @@ export async function fetchCodexUsage(
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${auth.accessToken}`,
-        "User-Agent": "Agent-Status/0.1.0",
+        "User-Agent": "Agent-Center",
         ...(auth.accountId ? { "chatgpt-account-id": auth.accountId } : {}),
       },
       proxy: parseProxy(options.proxyUrl),
@@ -100,7 +100,7 @@ export async function fetchClaudeUsage(
         Accept: "application/json",
         Authorization: `Bearer ${auth.accessToken}`,
         "anthropic-beta": "oauth-2025-04-20",
-        "User-Agent": "Agent-Status/0.1.0",
+        "User-Agent": "Agent-Center",
       },
       proxy: parseProxy(options.proxyUrl),
       timeout: REQUEST_TIMEOUT_MS,
@@ -162,7 +162,7 @@ function requestFailure<TSnapshot>(error: unknown): UsageResult<TSnapshot> {
     }
     return failure("request", "network", `Usage request failed in the current environment (${code}).`, true);
   }
-  return failure("internal", "internal", "Agent Status encountered an internal error.", false);
+  return failure("internal", "internal", "Agent Center encountered an internal error.", false);
 }
 
 function httpFailure<TSnapshot>(status: number, message: string): UsageResult<TSnapshot> {

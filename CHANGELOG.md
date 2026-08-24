@@ -1,5 +1,18 @@
 # Changelog / 更新日志
 
+## 0.1.2 - 2026-08-24
+
+### Changed / 变更
+
+- Renamed the visible extension brand to Agent Center while preserving the existing Marketplace extension ID and `agentStatus.*` settings.
+- 插件展示品牌改为 Agent Center，同时保留现有 Marketplace 扩展 ID 和 `agentStatus.*` 设置。
+- Added Codicon section markers for status meaning, account, plan, usage windows, last update, and hover actions.
+- 为悬浮详情中的状态栏含义、账户、套餐、额度窗口、最后更新时间和操作入口增加 Codicon 图标。
+- Moved repository metadata and documentation links to `mapengsen/Agent-Center`.
+- 仓库元数据和文档链接迁移至 `mapengsen/Agent-Center`。
+- Corrected the Open Settings command to target the stable extension ID `pengsen.codex-claude-agent-status`.
+- 修正“打开设置”命令，使其指向稳定扩展 ID `pengsen.codex-claude-agent-status`。
+
 ## 0.1.1 - 2026-08-20
 
 ### Changed / 变更
@@ -15,8 +28,8 @@
 
 ### Added / 新增
 
-- Initial independent Agent Status release extracted from Notifyer.
-- Agent Status 从 Notifyer 中拆分并首次独立发布。
+- Initial independent release extracted from Notifyer.
+- 从 Notifyer 中拆分并首次独立发布。
 - Codex and Claude credentials and quota requests run directly in the current local, Remote SSH, WSL, or Dev Container workspace environment.
 - Codex 与 Claude 凭据和额度请求直接运行在当前本地、Remote SSH、WSL 或 Dev Container 工作区环境中。
 - Added compact quota status, detailed hover information, refresh animations, remaining/used modes, startup retries, diagnostics, and legacy Notifyer quota-setting fallback.

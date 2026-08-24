@@ -1,14 +1,14 @@
 {
   "name": "codex-claude-agent-status",
-  "displayName": "Agent Status for Codex & Claude",
-  "description": "Codex and Claude usage quotas in the VS Code status bar, requested from the current local or remote workspace environment.",
-  "version": "0.1.1",
+  "displayName": "Agent Center",
+  "description": "AI coding-agent usage, account, and reset details in the VS Code status bar. Currently supports Codex and Claude.",
+  "version": "0.1.2",
   "publisher": "pengsen",
   "license": "MIT",
-  "icon": "resources/images/agent-status.png",
+  "icon": "resources/images/agent-center.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mapengsen/Agent-Status.git"
+    "url": "https://github.com/mapengsen/Agent-Center.git"
   },
   "engines": {
     "vscode": "^1.93.0"
@@ -29,7 +29,10 @@
     "openai",
     "anthropic",
     "quota",
-    "usage"
+    "usage",
+    "coding agent",
+    "multi-agent",
+    "status bar"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
@@ -48,31 +51,31 @@
     "commands": [
       {
         "command": "agentStatus.refreshCodexUsage",
-        "title": "Agent Status: Refresh Codex Usage"
+        "title": "Agent Center: Refresh Codex Usage"
       },
       {
         "command": "agentStatus.chooseCodexUsageDisplayMode",
-        "title": "Agent Status: Choose Codex Usage Display"
+        "title": "Agent Center: Choose Codex Usage Display"
       },
       {
         "command": "agentStatus.refreshClaudeUsage",
-        "title": "Agent Status: Refresh Claude Usage"
+        "title": "Agent Center: Refresh Claude Usage"
       },
       {
         "command": "agentStatus.chooseClaudeUsageDisplayMode",
-        "title": "Agent Status: Choose Claude Usage Display"
+        "title": "Agent Center: Choose Claude Usage Display"
       },
       {
         "command": "agentStatus.showDiagnostics",
-        "title": "Agent Status: Show Diagnostics"
+        "title": "Agent Center: Show Diagnostics"
       },
       {
         "command": "agentStatus.openSettings",
-        "title": "Agent Status: Open Settings"
+        "title": "Agent Center: Open Settings"
       }
     ],
     "configuration": {
-      "title": "Agent Status",
+      "title": "Agent Center",
       "properties": {
         "agentStatus.codex.enabled": {
           "type": "boolean",
