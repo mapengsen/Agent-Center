@@ -30,20 +30,30 @@ Agent Center brings AI coding-agent insights and utilities into VS Code. It disp
 
 Update Agent Center, reload the VS Code window, and click an existing absolute file-path link in Codex. If Codex records the supported open failure, Agent Center runs `code -r` with that path. No special link format or changes to Codex are required. Supported formats: PNG, JPEG, GIF, WebP, BMP, ICO, PDF, and SVG. PDF preview requires a suitable viewer extension; SVG and other files use your configured default editor.
 
+PDF and SVG can also be opened successfully as plain text by Codex, so no failure log is produced. Agent Center now detects these active text tabs, closes the unmodified text tabs for that file, and then runs `code -r`. Closing them first allows the CLI to select the default viewer instead of reusing the text editor. Existing custom viewers, diffs, and unsaved edits are preserved. This also checks an active PDF/SVG text tab when the listener starts.
+
+VS Code does not expose which extension opened a text tab. Consequently, this PDF/SVG recovery applies to text tabs opened from any source, not just Codex. Turn off `agentStatus.codexImageLinks.reopenTextDocuments` when you want to edit SVG source or inspect PDF text. If the default editor still returns a text tab, the listener leaves it alone to prevent a reopen loop.
+
 Agent Center starts the CLI bundled with the current VS Code installation as a background process, passing the path as a literal argument. It does not type commands into your terminal. Remote sessions use the current extension host's CLI connection. On Windows, it runs the same CLI entry point as `code.cmd` directly, preserving spaces, Unicode, and special characters in paths. CLI failures appear in Show Diagnostics.
 
 In Remote SSH, WSL, or Dev Containers, install Agent Center in the workspace environment where Codex handles the file. Both extensions must use the same extension host and window. This feature does not translate remote paths into local Windows paths. If you installed the separate experimental **Codex Image Opener** extension, disable or uninstall it first to avoid duplicate handling.
 
-This is a compatibility workaround based on the failure-log format inspected in Codex `26.917.62051`, not a public Codex click-event API. Relative paths and web URLs are not handled. A future Codex update may require an adjustment. Automated tests cover log recovery with a mocked VS Code API, CLI selection, and literal argument delivery to real child processes; actual clicks in a remote VS Code session have not yet been verified.
+The failure-log fallback is based on the format inspected in Codex `26.917.62051`, not a public Codex click-event API; future Codex versions may require an adjustment. PDF/SVG text-tab recovery uses VS Code editor events independently of that log. Web URLs and virtual documents are not handled. Automated tests cover both recovery paths with a mocked VS Code API, CLI selection, and literal argument delivery to real child processes; actual clicks in a remote VS Code session have not yet been verified.
 
 Agent Center reads only new entries from the current window's existing `Codex.log`, skips historical entries on activation, and opens files only in a focused, trusted window. It does not copy, move, or write that log. Recent recovery diagnostics are limited to 40 entries in memory; VS Code manages the original logs.
 
 - `agentStatus.codexImageLinks.enabled`: turn automatic recovery on or off (default: `true`).
-- **Agent Center: Show Diagnostics**: inspect `codexImageLinks.status`, the detected log path, and recent results. `watching` means the log is available; `waiting for Codex.log` means it has not appeared at the expected location.
+- `agentStatus.codexImageLinks.reopenTextDocuments`: recover clean PDF/SVG text tabs from any source (default: `true`). Disable to keep editing these formats as text.
+- **Agent Center: Show Diagnostics**: inspect `codexImageLinks.status`, `textEditorRecovery`, the detected log path, and recent results. Results identify `codex-log` or `text-editor` as their source. `watching` means the log is available; `waiting for Codex.log` means it has not appeared at the expected location. PDF/SVG editor-event recovery can still run while waiting for the log.
 - **Agent Center: Restart Codex Image Link Listener**: restart after troubleshooting, then click the link again.
 - `agentStatus.codexImageLinks.logFile`: advanced override for the absolute path to the current window and extension host's `Codex.log`. Leave empty for automatic detection. It selects a file to read, not a destination for new logs.
 
 ## Changelog
+
+### 0.1.6 - 2026-09-29
+
+- Fixed PDF/SVG recovery when Codex opens the file as text without logging an error: close the clean text tabs before running `code -r`.
+- Added an independent text-tab recovery setting, unsaved-edit protection, loop prevention, and diagnostic event sources.
 
 ### 0.1.5 - 2026-09-29
 

@@ -137,12 +137,14 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   let prototype = false;
   let override = "";
   let tick: (() => void) | undefined;
+  let textListenerCount = 0;
+  let reopenTextDocuments = true;
   const uri = (value: string) => ({ scheme: "file", fsPath: value });
   const vscode = {
     window: { state: { focused: true } },
     workspace: {
       isTrusted: true,
-      getConfiguration: () => ({ get: (key: string, fallback: unknown) => key === "enabled" ? enabled : key === "logFile" ? override : fallback }),
+      getConfiguration: () => ({ get: (key: string, fallback: unknown) => key === "enabled" ? enabled : key === "logFile" ? override : key === "reopenTextDocuments" ? reopenTextDocuments : fallback }),
       fs: { stat: async (resource: { fsPath: string }) => ({ type: (await fs.stat(resource.fsPath)).isFile() ? 1 : 2 }) },
     },
     commands: { executeCommand: async () => assert.fail("Must use the CLI, not vscode.open") },
@@ -156,6 +158,12 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   vm.runInNewContext(source, {
     require: (name: string) => name === "vscode" ? vscode : name === "./codeCli" ? {
       openWithCodeCli: async (...args: unknown[]) => { calls.push(args); },
+    } : name === "./textEditorLinks" ? {
+      TextEditorLinkRecovery: class {
+        constructor() { textListenerCount++; }
+        getDiagnostics() { return { enabled: true }; }
+        dispose() { textListenerCount--; }
+      },
     } : nativeRequire(name),
     module, exports: module.exports, process,
     setInterval: (callback: () => void) => { tick = callback; return { unref() {} }; },
@@ -173,6 +181,7 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   }
   await monitor.restart();
   assert.equal(diagnostics().status, "watching");
+  assert.equal(textListenerCount, 1);
   assert.equal(calls.length, 0);
   const appended = failure(target) + "\n";
   await fs.appendFile(log, appended);
@@ -198,11 +207,13 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   tick!();
   await until(() => diagnostics().recentEvents.length === 40);
   await monitor.restart(); // Cancels the old generation and seeks to EOF.
+  assert.equal(textListenerCount, 1);
   assert.ok(diagnostics().recentEvents.length <= 40);
   assert.equal(calls.length, 3);
   enabled = false;
   await monitor.restart();
   assert.equal(diagnostics().status, "disabled");
+  assert.equal(textListenerCount, 0);
   assert.equal(tick, undefined);
   enabled = true; vscode.workspace.isTrusted = false;
   await monitor.restart();
@@ -213,6 +224,10 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   prototype = false; override = "relative.log";
   await monitor.restart();
   assert.match(diagnostics().status, /absolute path/);
+  override = ""; reopenTextDocuments = false;
+  await monitor.restart();
+  assert.equal(diagnostics().status, "watching");
+  assert.equal(textListenerCount, 0);
   monitor.dispose();
   assert.equal(diagnostics().recentEvents.length, 0);
   assert.equal(await fs.readFile(entry, "utf8"), source);

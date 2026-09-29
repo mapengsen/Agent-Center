@@ -1,5 +1,16 @@
 # Changelog / 更新日志
 
+## 0.1.6 - 2026-09-29
+
+### Fixed / 修复
+
+- Fixed the missing recovery path when Codex successfully opens PDF/SVG as text and emits no failure log. Clean text tabs for the same file are closed before `code -r`, allowing the default viewer to open.
+- 修复 Codex 将 PDF/SVG 成功打开为文本、没有失败日志时无法触发补开的问题。先关闭同一文件未修改的文本标签页，再执行 `code -r`，交给默认查看器。
+- Added `agentStatus.codexImageLinks.reopenTextDocuments` (default on). It applies to PDF/SVG text tabs from all sources, because VS Code does not expose the opener. Disable it for source editing. Unsaved edits, custom viewers, and diff editors are preserved; fallback text tabs are not repeatedly reopened.
+- 新增默认启用的 `agentStatus.codexImageLinks.reopenTextDocuments`。由于 VS Code 不暴露打开来源，该设置适用于所有 PDF/SVG 文本标签页；编辑源码时可关闭。保留未保存修改、已有预览和差异编辑器，并防止反复重开。
+- Recent in-memory diagnostics now distinguish `text-editor` events from `codex-log` events.
+- 内存中的最近诊断现在区分 `text-editor` 与 `codex-log` 事件来源。
+
 ## 0.1.5 - 2026-09-29
 
 ### Changed / 变更

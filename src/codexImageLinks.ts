@@ -2,13 +2,15 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { ImageLinkRecovery } from "./imageLinkRecovery";
 import { LogTail } from "./logTail";
-import { openWithCodeCli } from "./codeCli";
+import { openWithCodeCli, resolveCodeCliLaunch, runCodeCli } from "./codeCli";
+import { TextEditorLinkRecovery } from "./textEditorLinks";
 
 interface RecoveryEvent {
   at: string;
   status: "opened" | "missing" | "failed";
   path: string;
   error?: string;
+  source: "codex-log" | "text-editor";
 }
 
 export class CodexImageLinkMonitor implements vscode.Disposable {
@@ -16,6 +18,7 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
   private disposed = false;
   private timer: NodeJS.Timeout | undefined;
   private tail: LogTail | undefined;
+  private textLinks: TextEditorLinkRecovery | undefined;
   private state = "starting";
   private opened = 0;
   private readonly recentEvents: RecoveryEvent[] = [];
@@ -31,6 +34,7 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
       focused: vscode.window.state.focused,
       opened: this.opened,
       openMethod: "code -r",
+      textEditorRecovery: this.textLinks?.getDiagnostics() ?? { enabled: false },
       recentEvents: [...this.recentEvents],
     };
   }
@@ -40,6 +44,8 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
     clearInterval(this.timer);
     this.timer = undefined;
     this.tail = undefined;
+    this.textLinks?.dispose();
+    this.textLinks = undefined;
     this.state = "starting";
     if (this.disposed) { this.state = "disposed"; return; }
     const config = vscode.workspace.getConfiguration("agentStatus.codexImageLinks");
@@ -64,18 +70,32 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
     const tail = new LogTail(filename);
     this.tail = tail;
     const current = () => !this.disposed && this.generation === run;
+    const isActive = () => current() && vscode.workspace.isTrusted && vscode.window.state.focused;
+    const cliHost = {
+      appRoot: vscode.env.appRoot,
+      remote: !!vscode.env.remoteName,
+      platform: process.platform,
+      execPath: process.execPath,
+    };
+    if (config.get<boolean>("reopenTextDocuments", true)) {
+      this.textLinks = new TextEditorLinkRecovery({
+        isActive,
+        prepare: async target => {
+          const launch = await resolveCodeCliLaunch(cliHost, target);
+          return () => runCodeCli(launch);
+        },
+        onResult: result => {
+          if (current()) this.record({ ...result, source: "text-editor" });
+        },
+      });
+    }
     const recovery = new ImageLinkRecovery({
-      isActive: () => current() && vscode.workspace.isTrusted && vscode.window.state.focused,
+      isActive,
       isFile: async (target) => {
         const stat = await vscode.workspace.fs.stat(vscode.Uri.file(target));
         return (stat.type & vscode.FileType.File) !== 0;
       },
-      open: (target) => openWithCodeCli({
-        appRoot: vscode.env.appRoot,
-        remote: !!vscode.env.remoteName,
-        platform: process.platform,
-        execPath: process.execPath,
-      }, target),
+      open: (target) => openWithCodeCli(cliHost, target),
     });
     try {
       await tail.prime();
@@ -98,10 +118,7 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
           const result = await recovery.handle(line);
           if (!current()) break;
           if (result.status === "opened" || result.status === "missing" || result.status === "failed") {
-            if (result.status === "opened") this.opened++;
-            // Diagnostics stay in bounded memory, not an additional log file.
-            this.recentEvents.push({ at: new Date().toISOString(), ...result });
-            if (this.recentEvents.length > 40) this.recentEvents.shift();
+            this.record({ ...result, source: "codex-log" });
           }
         }
       } catch (error) {
@@ -114,10 +131,18 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
     this.timer.unref();
   }
 
+  private record(result: Omit<RecoveryEvent, "at">): void {
+    if (result.status === "opened") this.opened++;
+    // Diagnostics stay in bounded memory, not an additional log file.
+    this.recentEvents.push({ at: new Date().toISOString(), ...result });
+    if (this.recentEvents.length > 40) this.recentEvents.shift();
+  }
+
   public dispose(): void {
     this.disposed = true;
     this.generation++;
     clearInterval(this.timer);
+    this.textLinks?.dispose();
     this.state = "disposed";
     this.recentEvents.length = 0;
   }
