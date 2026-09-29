@@ -70,17 +70,19 @@ test("uses startup cadence and retries failed regular refreshes", () => {
 });
 
 test("resolves credentials inside the extension host environment", () => {
+  const windows = process.platform === "win32";
+  const homeDirectory = windows ? "C:\\Users\\alice" : "/home/alice";
   assert.equal(
-    resolveCredentialFilePath("", "/srv/codex", ".codex", "auth.json", "/home/alice"),
-    "/srv/codex/auth.json",
+    resolveCredentialFilePath("", windows ? "D:\\codex" : "/srv/codex", ".codex", "auth.json", homeDirectory),
+    windows ? "D:\\codex\\auth.json" : "/srv/codex/auth.json",
   );
   assert.equal(
-    resolveCredentialFilePath("~/.secrets/codex.json", undefined, ".codex", "auth.json", "/home/alice"),
-    "/home/alice/.secrets/codex.json",
+    resolveCredentialFilePath("~/.secrets/codex.json", undefined, ".codex", "auth.json", homeDirectory),
+    windows ? "C:\\Users\\alice\\.secrets\\codex.json" : "/home/alice/.secrets/codex.json",
   );
   assert.equal(
-    resolveCredentialFilePath("", undefined, ".claude", ".credentials.json", "/home/alice"),
-    "/home/alice/.claude/.credentials.json",
+    resolveCredentialFilePath("", undefined, ".claude", ".credentials.json", homeDirectory),
+    windows ? "C:\\Users\\alice\\.claude\\.credentials.json" : "/home/alice/.claude/.credentials.json",
   );
 });
 

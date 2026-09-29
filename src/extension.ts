@@ -1,17 +1,21 @@
 import * as vscode from "vscode";
 import { ClaudeUsageMonitor } from "./claudeUsage";
 import { CodexUsageMonitor } from "./codexUsage";
+import { CodexImageLinkMonitor } from "./codexImageLinks";
 
 export function activate(context: vscode.ExtensionContext): void {
   const codexUsage = new CodexUsageMonitor();
   const claudeUsage = new ClaudeUsageMonitor();
+  const codexImageLinks = new CodexImageLinkMonitor(context);
   const diagnostics = vscode.window.createOutputChannel("Agent Center");
 
   context.subscriptions.push(
     codexUsage,
     claudeUsage,
+    codexImageLinks,
     diagnostics,
     vscode.commands.registerCommand("agentStatus.refreshCodexUsage", () => codexUsage.refresh("manual")),
+    vscode.commands.registerCommand("agentStatus.restartCodexImageLinks", () => codexImageLinks.restart()),
     vscode.commands.registerCommand(
       "agentStatus.chooseCodexUsageDisplayMode",
       () => codexUsage.chooseDisplayMode(),
@@ -31,10 +35,15 @@ export function activate(context: vscode.ExtensionContext): void {
         extensionHost: vscode.env.remoteName ?? "local",
         codex: codexUsage.getDiagnostics(),
         claude: claudeUsage.getDiagnostics(),
+        codexImageLinks: codexImageLinks.getDiagnostics(),
       }, null, 2));
       diagnostics.show(true);
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("agentStatus.codexImageLinks") ||
+          event.affectsConfiguration("codexImageOpener.enabled")) {
+        void codexImageLinks.restart();
+      }
       const codexChanged = event.affectsConfiguration("agentStatus.codex") ||
         event.affectsConfiguration("codexTaskCompanion.codex.credentialsPath") ||
         event.affectsConfiguration("codexTaskCompanion.codex.usageUpdateIntervalSeconds") ||
@@ -67,10 +76,13 @@ export function activate(context: vscode.ExtensionContext): void {
         }
       }
     }),
+    vscode.workspace.onDidGrantWorkspaceTrust(() => { void codexImageLinks.restart(); }),
+    vscode.extensions.onDidChange(() => { void codexImageLinks.restart(); }),
   );
 
   codexUsage.start();
   claudeUsage.start();
+  void codexImageLinks.restart();
 }
 
 export function deactivate(): void {

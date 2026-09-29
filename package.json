@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "AI coding-agent usage, account, and reset details in the VS Code status bar. Currently supports Codex and Claude.",
-  "version": "0.1.3",
+  "description": "Codex and Claude usage details in the status bar, plus automatic recovery for Codex image links.",
+  "version": "0.1.4",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -50,6 +50,10 @@
     },
     "commands": [
       {
+        "command": "agentStatus.restartCodexImageLinks",
+        "title": "Agent Center: Restart Codex Image Link Listener"
+      },
+      {
         "command": "agentStatus.refreshCodexUsage",
         "title": "Agent Center: Refresh Codex Usage"
       },
@@ -77,6 +81,17 @@
     "configuration": {
       "title": "Agent Center",
       "properties": {
+        "agentStatus.codexImageLinks.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "点击 Codex 图片链接未打开时尝试自动补开。实验功能，支持同一运行环境中的绝对图片路径。"
+        },
+        "agentStatus.codexImageLinks.logFile": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "高级设置：当前窗口、当前扩展运行环境中的 Codex.log 绝对路径。留空自动定位；只读取，不修改或移动日志。"
+        },
         "agentStatus.codex.enabled": {
           "type": "boolean",
           "default": true,
@@ -154,7 +169,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },
@@ -162,7 +177,7 @@
     "axios": "^1.7.9"
   },
   "devDependencies": {
-    "@types/node": "20.14.0",
+    "@types/node": "20.19.43",
     "@types/vscode": "1.93.0",
     "@vscode/vsce": "3.9.2",
     "typescript": "^5.5.4"

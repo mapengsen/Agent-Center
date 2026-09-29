@@ -1,5 +1,16 @@
 # Changelog / 更新日志
 
+## 0.1.4 - 2026-09-29
+
+### Added / 新增
+
+- Added experimental recovery for supported absolute image links that Codex fails to open, enabled by default. Uses `vscode.open` without modifying Codex or requiring custom links.
+- 新增 Codex 图片绝对路径链接打开失败后自动补开的实验功能，默认启用；使用 `vscode.open`，无需修改 Codex 或使用专用链接。
+- Reads only new failure records from the current window and extension host's existing Codex log, with bounded reads, rotation handling, duplicate suppression, and focus/trust checks.
+- 只读取当前窗口、当前扩展宿主既有 Codex 日志中的新增失败记录，支持读取量限制、日志轮转、去重及窗口焦点与工作区信任检查。
+- Added settings, a restart command, and up to 40 recent recovery results held in memory and exposed through Show Diagnostics. Does not create an additional log file.
+- 新增配置开关、重启监听命令及 Show Diagnostics 中的补开结果；最多在内存保留最近 40 条记录，不额外创建日志文件。
+
 ## 0.1.3 - 2026-08-24
 
 ### Changed / 变更

@@ -2,7 +2,7 @@
 
 Language: <a href="https://github.com/mapengsen/Agent-Center/tree/main">English (default)</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center brings AI coding-agent insights and utilities into VS Code. The current release displays Codex and Claude usage quotas directly in the status bar.
+Agent Center brings AI coding-agent insights and utilities into VS Code. It displays Codex and Claude usage quotas in the status bar and helps open image links from Codex conversations.
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -22,10 +22,31 @@ Agent Center brings AI coding-agent insights and utilities into VS Code. The cur
 - Remaining/used display modes, with click-to-refresh support directly from the status bar.
 - An animated refresh indicator during manual requests only; automatic refreshes keep the normal status display.
 - An immediate startup refresh followed by three automatic refreshes at 60-second intervals, then the regular default interval of 15 minutes. Failed regular refreshes retry every 30 seconds, up to five attempts per cycle.
+- Automatic recovery for supported Codex image links that fail to open (experimental, enabled by default).
 
 ![Agent Center status bar preview](image.png)
 
+## Opening images from Codex
+
+Update Agent Center, reload the VS Code window, and click an existing absolute image-path link in Codex. If Codex records the supported open failure, Agent Center opens the image in a normal editor tab. No special link format or changes to Codex are required. Supported formats: PNG, JPEG, GIF, WebP, BMP, and ICO.
+
+In Remote SSH, WSL, or Dev Containers, install Agent Center in the workspace environment where Codex handles the file. Both extensions must use the same extension host and window. This feature does not translate remote paths into local Windows paths. If you installed the separate experimental **Codex Image Opener** extension, disable or uninstall it first to avoid duplicate handling.
+
+This is a compatibility workaround based on the failure-log format inspected in Codex `26.917.62051`, not a public Codex click-event API. Relative paths, web URLs, SVG, and PDF are not handled. A future Codex update may require an adjustment. Automated tests cover the log-to-editor flow with a mocked VS Code API; actual clicks in a remote VS Code session have not yet been verified.
+
+Agent Center reads only new entries from the current window's existing `Codex.log`, skips historical entries on activation, and opens files only in a focused, trusted window. It does not copy, move, or write that log. Recent recovery diagnostics are limited to 40 entries in memory; VS Code manages the original logs.
+
+- `agentStatus.codexImageLinks.enabled`: turn automatic recovery on or off (default: `true`).
+- **Agent Center: Show Diagnostics**: inspect `codexImageLinks.status`, the detected log path, and recent results. `watching` means the log is available; `waiting for Codex.log` means it has not appeared at the expected location.
+- **Agent Center: Restart Codex Image Link Listener**: restart after troubleshooting, then click the link again.
+- `agentStatus.codexImageLinks.logFile`: advanced override for the absolute path to the current window and extension host's `Codex.log`. Leave empty for automatic detection. It selects a file to read, not a destination for new logs.
+
 ## Changelog
+
+### 0.1.4 - 2026-09-29
+
+- Added automatic recovery for supported absolute image links in Codex, with diagnostics and an enable/disable setting.
+- Added incremental, bounded log reading with rotation handling and duplicate suppression; recovery diagnostics stay in memory.
 
 ### 0.1.3 - 2026-08-24
 
