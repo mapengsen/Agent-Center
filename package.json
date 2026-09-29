@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "Codex and Claude usage details in the status bar, plus automatic recovery for Codex image links.",
-  "version": "0.1.6",
+  "description": "Codex and Claude usage details in the status bar, plus file-link recovery through the VS Code CLI.",
+  "version": "0.1.7",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -51,7 +51,7 @@
     "commands": [
       {
         "command": "agentStatus.restartCodexImageLinks",
-        "title": "Agent Center: Restart Codex Image Link Listener"
+        "title": "Agent Center: Restart Codex File Link Listener"
       },
       {
         "command": "agentStatus.refreshCodexUsage",
@@ -84,7 +84,7 @@
         "agentStatus.codexImageLinks.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "点击 Codex 图片、PDF 或 SVG 链接未打开时，执行 code -r 尝试补开。实验功能，支持同一运行环境中的绝对路径。"
+          "description": "点击 Codex 支持格式的文件链接未打开时，执行 code -r 尝试补开。实验功能，支持同一运行环境中的绝对路径。"
         },
         "agentStatus.codexImageLinks.logFile": {
           "type": "string",
@@ -95,7 +95,19 @@
         "agentStatus.codexImageLinks.reopenTextDocuments": {
           "type": "boolean",
           "default": true,
-          "description": "PDF/SVG 被当作文本打开时，关闭该文件未修改的文本标签页，再执行 code -r 交给默认查看器。适用于所有打开来源，不限 Codex；编辑 SVG 源码时可关闭。不会关闭有未保存修改的标签页。"
+          "description": "支持列表中的文件被当作文本打开时，关闭该文件未修改的文本标签页，再执行 code -r 交给默认编辑器。适用于所有打开来源，不限 Codex；需要保留源码编辑时可关闭或从 extensions 列表移除相应格式。不会关闭有未保存修改的标签页。"
+        },
+        "agentStatus.codexImageLinks.extensions": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^\\.?[a-zA-Z0-9][a-zA-Z0-9_-]*$" },
+          "uniqueItems": true,
+          "default": [
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".svg",
+            ".md", ".markdown", ".mdx", ".rst", ".csv", ".tsv", ".html", ".htm", ".ipynb",
+            ".tex", ".bib", ".txt", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
+            ".docx", ".xlsx", ".pptx"
+          ],
+          "description": "使用 code -r 补开的文件扩展名，同时控制失败日志与文本标签页两条补开流程。大小写不敏感，可带或不带前导点；列表为空则不处理任何格式。预览方式取决于 VS Code 默认编辑器及已安装的查看器扩展。"
         },
         "agentStatus.codex.enabled": {
           "type": "boolean",

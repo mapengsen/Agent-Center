@@ -1,5 +1,19 @@
 # Changelog / 更新日志
 
+## 0.1.7 - 2026-09-29
+
+### Added / 新增
+
+- Expanded `code -r` recovery to 31 default extensions: existing images/PDF/SVG plus Markdown, CSV/TSV, HTML, notebooks, LaTeX/BibTeX, text/configuration files (including TOML), and Office documents. Files follow VS Code's default editor; PDF/Office previews need suitable viewer extensions.
+- 将 `code -r` 补开范围扩展到 31 种默认扩展名：保留图片/PDF/SVG，新增 Markdown、CSV/TSV、HTML、Notebook、LaTeX/BibTeX、普通文本与配置（含 TOML），以及 Office 文档。文件遵循 VS Code 默认编辑器设置，PDF/Office 预览需要相应查看器扩展。
+- Added `agentStatus.codexImageLinks.extensions` to configure both failure-log and text-tab recovery. Text-tab detection continues to apply to all sources; disable it with `reopenTextDocuments` or remove individual formats from the list.
+- 新增 `agentStatus.codexImageLinks.extensions`，统一配置日志与文本标签页补开的格式。文本标签页检测仍适用于所有来源，可通过 `reopenTextDocuments` 关闭或从列表移除特定格式。
+
+### Fixed / 修复
+
+- Preserved native notebook tabs and prevented repeated reopening when a slow CLI launch returns a text editor, including Markdown, CSV, TOML, and other text formats.
+- 保留原生 Notebook 标签页，并防止 CLI 启动较慢、返回 Markdown、CSV、TOML 等文本编辑器时反复重开。
+
 ## 0.1.6 - 2026-09-29
 
 ### Fixed / 修复

@@ -1,8 +1,10 @@
 import * as path from "node:path";
+import { DEFAULT_LINK_EXTENSIONS, isSupportedLinkPath } from "./linkFormats";
 
 export function parseCodexImageOpenFailure(
   line: string,
   platform: NodeJS.Platform = process.platform,
+  extensions: readonly string[] = DEFAULT_LINK_EXTENSIONS,
 ): string | undefined {
   // Match only the known absolute-file opener failure, not arbitrary path
   // mentions, relative paths with an unknown cwd, or reveal-in-OS requests.
@@ -16,7 +18,7 @@ export function parseCodexImageOpenFailure(
   }
   if (typeof target !== "string" || /[\x00-\x1f]/.test(target)) return undefined;
   const paths = platform === "win32" ? path.win32 : path.posix;
-  if (!paths.isAbsolute(target) || !/\.(?:png|jpe?g|gif|webp|bmp|ico|pdf|svg)$/i.test(target)) return undefined;
+  if (!paths.isAbsolute(target) || !isSupportedLinkPath(target, extensions)) return undefined;
   // Do not accidentally treat a Linux server path as a Windows drive-relative path.
   if (platform === "win32" && !/^(?:[a-z]:[\\/]|\\\\[^\\]+\\|\/\/[^/]+\/)/i.test(target)) return undefined;
   return target;
@@ -29,6 +31,7 @@ export type ImageRecoveryResult =
 
 export interface ImageRecoveryOptions {
   platform?: NodeJS.Platform;
+  extensions?: readonly string[];
   isActive(): boolean;
   isFile(path: string): Promise<boolean>;
   open(path: string): PromiseLike<unknown>;
@@ -41,7 +44,7 @@ export class ImageLinkRecovery {
   public constructor(private readonly options: ImageRecoveryOptions) {}
 
   public async handle(line: string): Promise<ImageRecoveryResult> {
-    const target = parseCodexImageOpenFailure(line, this.options.platform);
+    const target = parseCodexImageOpenFailure(line, this.options.platform, this.options.extensions);
     if (!target || !this.options.isActive()) return { status: "ignored" };
     const now = this.options.now?.() ?? Date.now();
     const previous = this.recent.get(target);

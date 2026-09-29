@@ -6,6 +6,7 @@ import * as os from "node:os";
 import * as vm from "node:vm";
 import { createRequire } from "node:module";
 import type { TextEditorLinkOptions, TextEditorLinkRecovery, TextEditorLinkResult } from "../textEditorLinks";
+import { DEFAULT_LINK_EXTENSIONS } from "../linkFormats";
 
 class Resource {
   public readonly fsPath: string;
@@ -18,11 +19,12 @@ class Resource {
 }
 class TextInput { constructor(public readonly uri: Resource) {} }
 class CustomInput { constructor(public readonly uri: Resource) {} }
+class NotebookInput { constructor(public readonly uri: Resource) {} }
 class DiffInput { constructor(public readonly modified: Resource) {} }
-interface Tab { input: TextInput | CustomInput | DiffInput; isDirty: boolean }
+interface Tab { input: TextInput | CustomInput | NotebookInput | DiffInput; isDirty: boolean }
 interface Document { uri: Resource; isDirty: boolean; isClosed: boolean }
 
-async function setup(t: TestContext, extension = "pdf") {
+async function setup(t: TestContext, extension = "pdf", extensions?: readonly string[]) {
   const resource = new Resource(`论文 图 & special.${extension}`);
   const document: Document = { uri: resource, isDirty: false, isClosed: false };
   const original: Tab = { input: new TextInput(resource), isDirty: false };
@@ -59,7 +61,7 @@ async function setup(t: TestContext, extension = "pdf") {
       },
     },
   };
-  const vscode = { window, env: { remoteName: "ssh-remote" }, TabInputText: TextInput, TabInputCustom: CustomInput };
+  const vscode = { window, env: { remoteName: "ssh-remote" }, TabInputText: TextInput, TabInputCustom: CustomInput, TabInputNotebook: NotebookInput };
   const entry = path.resolve(__dirname, "../textEditorLinks.js");
   const nativeRequire = createRequire(entry);
   const module = { exports: {} as { TextEditorLinkRecovery: new (options: TextEditorLinkOptions) => TextEditorLinkRecovery } };
@@ -71,6 +73,7 @@ async function setup(t: TestContext, extension = "pdf") {
     Date: class extends Date { static now() { return state.now; } },
   }, { filename: entry });
   const listener = new module.exports.TextEditorLinkRecovery({
+    extensions,
     isActive: () => state.active,
     prepare: async target => {
       state.order.push("prepare"); state.prepared.push(target);
@@ -98,8 +101,8 @@ async function setup(t: TestContext, extension = "pdf") {
   };
 }
 
-test("PDF and SVG successfully opened as text are closed before CLI recovery without any failure log", async t => {
-  for (const format of ["pdf", "svg"]) {
+test("all supported formats opened as text are closed before CLI recovery without a failure log", async t => {
+  for (const format of DEFAULT_LINK_EXTENSIONS.map(extension => extension.slice(1))) {
     const h = await setup(t, format);
     const duplicate: Tab = { input: new TextInput(h.resource), isDirty: false };
     const unrelated: Tab = { input: new TextInput(new Resource("source.ts")), isDirty: false };
@@ -117,12 +120,13 @@ test("PDF and SVG successfully opened as text are closed before CLI recovery wit
 });
 
 test("dirty documents, dirty duplicate tabs, custom editors and diffs stay untouched", async t => {
-  for (const scenario of ["dirty-document", "dirty-tab", "dirty-duplicate", "custom", "diff", "inactive", "other-format", "virtual-uri"]) {
+  for (const scenario of ["dirty-document", "dirty-tab", "dirty-duplicate", "custom", "notebook", "diff", "inactive", "other-format", "virtual-uri"]) {
     const h = await setup(t);
     if (scenario === "dirty-document") h.document.isDirty = true;
     if (scenario === "dirty-tab") h.original.isDirty = true;
     if (scenario === "dirty-duplicate") h.group.tabs.push({ input: new TextInput(h.resource), isDirty: true });
     if (scenario === "custom") h.original.input = new CustomInput(h.resource);
+    if (scenario === "notebook") h.original.input = new NotebookInput(h.resource);
     if (scenario === "diff") h.original.input = new DiffInput(h.resource);
     if (scenario === "inactive") h.state.active = false;
     if (scenario === "other-format") h.document.uri = new Resource("source.ts");
@@ -161,14 +165,39 @@ test("a missing CLI preserves the source tab and a cancelled close never launche
 });
 
 test("a CLI that returns another text tab cannot create a close/reopen loop", async t => {
-  const h = await setup(t);
-  h.state.onOpen = () => { h.showText(); };
+  for (const extension of ["pdf", "md", "csv", "toml", "json", "txt"]) {
+    const h = await setup(t, extension);
+    h.state.onOpen = () => { h.state.now += 6000; h.showText(); };
+    await h.listener.recoverActiveEditor();
+    await h.listener.recoverActiveEditor();
+    h.state.now += 6000;
+    await h.listener.recoverActiveEditor();
+    assert.equal(h.state.opened.length, 1, extension);
+    assert.equal(h.state.closed.length, 1, extension);
+  }
+});
+
+test("formats removed from the configured list are not closed or reopened", async t => {
+  for (const extensions of [[], [".pdf"]]) {
+    const h = await setup(t, "toml", extensions);
+    await h.listener.recoverActiveEditor();
+    assert.equal(h.state.closed.length, 0);
+    assert.equal(h.state.opened.length, 0);
+  }
+});
+
+test("native notebook results allow another text-open request without touching the notebook", async t => {
+  const h = await setup(t, "ipynb");
+  h.state.onOpen = () => {
+    const notebook = { input: new NotebookInput(h.resource), isDirty: false };
+    h.group.tabs.push(notebook); h.group.activeTab = notebook;
+    h.tabEvents.forEach(event => event({ opened: [notebook], changed: [] }));
+  };
   await h.listener.recoverActiveEditor();
+  h.showText();
   await h.listener.recoverActiveEditor();
-  h.state.now += 6000;
-  await h.listener.recoverActiveEditor();
-  assert.equal(h.state.opened.length, 1);
-  assert.equal(h.state.closed.length, 1);
+  assert.equal(h.state.opened.length, 2);
+  assert.ok(h.state.closed.every(tabs => tabs.every(tab => tab.input instanceof TextInput)));
 });
 
 test("a successful viewer allows another Codex text-open to be recovered immediately", async t => {

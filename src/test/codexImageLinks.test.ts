@@ -7,6 +7,7 @@ import * as vm from "node:vm";
 import { createRequire } from "node:module";
 import { parseCodexImageOpenFailure, ImageLinkRecovery } from "../imageLinkRecovery";
 import { LogTail } from "../logTail";
+import { DEFAULT_LINK_EXTENSIONS, normalizeLinkExtensions, isSupportedLinkPath } from "../linkFormats";
 import type { CodexImageLinkMonitor } from "../codexImageLinks";
 
 const failure = (target: string) => `2026-09-29 12:00:00.000 [error] Failed to handle absolute path actionVerb=open normalized=${/\s/.test(target) ? JSON.stringify(target) : target}`;
@@ -41,6 +42,36 @@ test("recognizes only exact absolute-image failures, including spaces and Unicod
     failure("/a.png") + " extra=field",
     failure("/a.png").replace("/a.png", '"/broken.png'),
   ]) assert.equal(parseCodexImageOpenFailure(line, "linux"), undefined);
+});
+
+test("every requested format is enabled in both runtime and settings defaults", async () => {
+  const expected = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".svg",
+    ".md", ".markdown", ".mdx", ".rst", ".csv", ".tsv", ".html", ".htm", ".ipynb",
+    ".tex", ".bib", ".txt", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
+    ".docx", ".xlsx", ".pptx"];
+  assert.deepEqual(DEFAULT_LINK_EXTENSIONS, expected);
+  const manifest = JSON.parse(await fs.readFile(path.resolve(__dirname, "../../package.json"), "utf8"));
+  assert.deepEqual(manifest.contributes.configuration.properties["agentStatus.codexImageLinks.extensions"].default, expected);
+  assert.equal(DEFAULT_LINK_EXTENSIONS.filter(ext => ext === ".toml").length, 1);
+  for (const extension of expected) {
+    const target = "/project/中文 文件" + extension.toUpperCase();
+    assert.equal(parseCodexImageOpenFailure(failure(target), "linux"), target);
+  }
+});
+
+test("custom extension lists normalize case and dots and exclude removed formats", async () => {
+  const extensions = normalizeLinkExtensions([" TOML ", ".toml", ".CSV", "csv", "", "../bad", "a/b", "*", null]);
+  assert.deepEqual(extensions, [".toml", ".csv"]);
+  assert.equal(isSupportedLinkPath("C:\\工作\\config.TOML", extensions), true);
+  assert.equal(parseCodexImageOpenFailure(failure("/project/a.csv"), "linux", extensions), "/project/a.csv");
+  assert.equal(parseCodexImageOpenFailure(failure("/project/a.pdf"), "linux", extensions), undefined);
+  assert.equal(parseCodexImageOpenFailure(failure("/project/a.csv"), "linux", []), undefined);
+  assert.deepEqual(normalizeLinkExtensions(undefined), DEFAULT_LINK_EXTENSIONS);
+  const opened: string[] = [];
+  const recovery = new ImageLinkRecovery({ platform: "linux", extensions, isActive: () => true, isFile: async () => true, open: async target => opened.push(target) });
+  assert.equal((await recovery.handle(failure("/a.md"))).status, "ignored");
+  assert.equal((await recovery.handle(failure("/a.toml"))).status, "opened");
+  assert.deepEqual(opened, ["/a.toml"]);
 });
 
 test("tail skips old history and delivers only complete new UTF-8 lines", async t => {
@@ -139,12 +170,13 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   let tick: (() => void) | undefined;
   let textListenerCount = 0;
   let reopenTextDocuments = true;
+  let extensionsSetting: unknown = undefined;
   const uri = (value: string) => ({ scheme: "file", fsPath: value });
   const vscode = {
     window: { state: { focused: true } },
     workspace: {
       isTrusted: true,
-      getConfiguration: () => ({ get: (key: string, fallback: unknown) => key === "enabled" ? enabled : key === "logFile" ? override : key === "reopenTextDocuments" ? reopenTextDocuments : fallback }),
+      getConfiguration: () => ({ get: (key: string, fallback: unknown) => key === "enabled" ? enabled : key === "logFile" ? override : key === "reopenTextDocuments" ? reopenTextDocuments : key === "extensions" ? extensionsSetting ?? fallback : fallback }),
       fs: { stat: async (resource: { fsPath: string }) => ({ type: (await fs.stat(resource.fsPath)).isFile() ? 1 : 2 }) },
     },
     commands: { executeCommand: async () => assert.fail("Must use the CLI, not vscode.open") },
@@ -228,6 +260,14 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   await monitor.restart();
   assert.equal(diagnostics().status, "watching");
   assert.equal(textListenerCount, 0);
+  extensionsSetting = ["TOML", ".toml"];
+  await monitor.restart();
+  const toml = path.join(root, "config.toml");
+  await fs.writeFile(toml, "enabled = true");
+  await fs.appendFile(log, failure(target) + "\n" + failure(toml) + "\n");
+  tick!();
+  await until(() => calls.length === 4);
+  assert.equal(calls[3][1], toml);
   monitor.dispose();
   assert.equal(diagnostics().recentEvents.length, 0);
   assert.equal(await fs.readFile(entry, "utf8"), source);

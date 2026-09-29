@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { DEFAULT_LINK_EXTENSIONS, isSupportedLinkPath } from "./linkFormats";
 
 export interface TextEditorLinkResult {
   status: "opened" | "failed";
@@ -8,6 +9,7 @@ export interface TextEditorLinkResult {
 }
 
 export interface TextEditorLinkOptions {
+  extensions?: readonly string[];
   isActive(): boolean;
   // Resolve the CLI before closing anything, so missing launchers leave the tab intact.
   prepare(target: string): Promise<() => Promise<void>>;
@@ -27,7 +29,9 @@ export class TextEditorLinkRecovery implements vscode.Disposable {
       vscode.window.onDidChangeActiveTextEditor(() => this.schedule()),
       vscode.window.tabGroups.onDidChangeTabs(event => {
         for (const tab of [...event.opened, ...event.changed]) {
-          if (tab.input instanceof vscode.TabInputCustom) this.recent.delete(tab.input.uri.toString());
+          if (tab.input instanceof vscode.TabInputCustom || tab.input instanceof vscode.TabInputNotebook) {
+            this.recent.delete(tab.input.uri.toString());
+          }
         }
         this.schedule();
       }),
@@ -36,7 +40,7 @@ export class TextEditorLinkRecovery implements vscode.Disposable {
   }
 
   public getDiagnostics(): object {
-    return { enabled: !this.disposed, busy: this.busy, formats: ["pdf", "svg"], scope: "clean active text tabs from any source" };
+    return { enabled: !this.disposed, busy: this.busy, formats: [...(this.options.extensions ?? DEFAULT_LINK_EXTENSIONS)], scope: "clean active text tabs from any source" };
   }
 
   private schedule(): void {
@@ -54,7 +58,8 @@ export class TextEditorLinkRecovery implements vscode.Disposable {
     if (!editor || !tab || !(tab.input instanceof vscode.TabInputText)) return undefined;
     const document = editor.document;
     const uri = document.uri;
-    if (document.isClosed || document.isDirty || tab.isDirty || !/\.(?:pdf|svg)$/i.test(uri.path)) return undefined;
+    if (document.isClosed || document.isDirty || tab.isDirty ||
+        !isSupportedLinkPath(uri.path, this.options.extensions ?? DEFAULT_LINK_EXTENSIONS)) return undefined;
     if (uri.scheme !== "file" && !(uri.scheme === "vscode-remote" && vscode.env.remoteName)) return undefined;
     if (!path.isAbsolute(uri.fsPath) || tab.input.uri.toString() !== uri.toString()) return undefined;
     return { tab, document, key: uri.toString() };
@@ -90,6 +95,12 @@ export class TextEditorLinkRecovery implements vscode.Disposable {
       if (!closed) throw new Error("The text tab could not be closed; code -r was not run.");
       if (this.disposed || !this.options.isActive()) return;
       await open();
+      // Start suppression after the CLI finishes too: a slow launch may take
+      // longer than the original interval, especially on remote machines.
+      if (this.recent.has(key)) this.recent.set(key, Date.now());
+      for (const item of vscode.window.tabGroups.all.flatMap(group => group.tabs)) {
+        if (item.input instanceof vscode.TabInputText && item.input.uri.toString() === key) this.handledTabs.add(item);
+      }
       if (!this.disposed) this.options.onResult({ status: "opened", path: document.uri.fsPath });
     } catch (error) {
       this.handledTabs.add(tab);
