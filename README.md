@@ -28,11 +28,13 @@ Agent Center brings AI coding-agent insights and utilities into VS Code. It disp
 
 ## Opening images from Codex
 
-Update Agent Center, reload the VS Code window, and click an existing absolute image-path link in Codex. If Codex records the supported open failure, Agent Center opens the image in a normal editor tab. No special link format or changes to Codex are required. Supported formats: PNG, JPEG, GIF, WebP, BMP, and ICO.
+Update Agent Center, reload the VS Code window, and click an existing absolute file-path link in Codex. If Codex records the supported open failure, Agent Center runs `code -r` with that path. No special link format or changes to Codex are required. Supported formats: PNG, JPEG, GIF, WebP, BMP, ICO, PDF, and SVG. PDF preview requires a suitable viewer extension; SVG and other files use your configured default editor.
+
+Agent Center starts the CLI bundled with the current VS Code installation as a background process, passing the path as a literal argument. It does not type commands into your terminal. Remote sessions use the current extension host's CLI connection. On Windows, it runs the same CLI entry point as `code.cmd` directly, preserving spaces, Unicode, and special characters in paths. CLI failures appear in Show Diagnostics.
 
 In Remote SSH, WSL, or Dev Containers, install Agent Center in the workspace environment where Codex handles the file. Both extensions must use the same extension host and window. This feature does not translate remote paths into local Windows paths. If you installed the separate experimental **Codex Image Opener** extension, disable or uninstall it first to avoid duplicate handling.
 
-This is a compatibility workaround based on the failure-log format inspected in Codex `26.917.62051`, not a public Codex click-event API. Relative paths, web URLs, SVG, and PDF are not handled. A future Codex update may require an adjustment. Automated tests cover the log-to-editor flow with a mocked VS Code API; actual clicks in a remote VS Code session have not yet been verified.
+This is a compatibility workaround based on the failure-log format inspected in Codex `26.917.62051`, not a public Codex click-event API. Relative paths and web URLs are not handled. A future Codex update may require an adjustment. Automated tests cover log recovery with a mocked VS Code API, CLI selection, and literal argument delivery to real child processes; actual clicks in a remote VS Code session have not yet been verified.
 
 Agent Center reads only new entries from the current window's existing `Codex.log`, skips historical entries on activation, and opens files only in a focused, trusted window. It does not copy, move, or write that log. Recent recovery diagnostics are limited to 40 entries in memory; VS Code manages the original logs.
 
@@ -42,6 +44,11 @@ Agent Center reads only new entries from the current window's existing `Codex.lo
 - `agentStatus.codexImageLinks.logFile`: advanced override for the absolute path to the current window and extension host's `Codex.log`. Leave empty for automatic detection. It selects a file to read, not a destination for new logs.
 
 ## Changelog
+
+### 0.1.5 - 2026-09-29
+
+- Changed recovery to execute `code -r` through the bundled CLI, with remote-window connection handling and bounded process execution.
+- Added PDF and SVG links, plus diagnostics for CLI failures.
 
 ### 0.1.4 - 2026-09-29
 

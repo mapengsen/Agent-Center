@@ -16,7 +16,7 @@ export function parseCodexImageOpenFailure(
   }
   if (typeof target !== "string" || /[\x00-\x1f]/.test(target)) return undefined;
   const paths = platform === "win32" ? path.win32 : path.posix;
-  if (!paths.isAbsolute(target) || !/\.(?:png|jpe?g|gif|webp|bmp|ico)$/i.test(target)) return undefined;
+  if (!paths.isAbsolute(target) || !/\.(?:png|jpe?g|gif|webp|bmp|ico|pdf|svg)$/i.test(target)) return undefined;
   // Do not accidentally treat a Linux server path as a Windows drive-relative path.
   if (platform === "win32" && !/^(?:[a-z]:[\\/]|\\\\[^\\]+\\|\/\/[^/]+\/)/i.test(target)) return undefined;
   return target;

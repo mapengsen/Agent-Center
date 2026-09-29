@@ -2,6 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { ImageLinkRecovery } from "./imageLinkRecovery";
 import { LogTail } from "./logTail";
+import { openWithCodeCli } from "./codeCli";
 
 interface RecoveryEvent {
   at: string;
@@ -29,6 +30,7 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
       codexVersion: vscode.extensions.getExtension("openai.chatgpt")?.packageJSON.version,
       focused: vscode.window.state.focused,
       opened: this.opened,
+      openMethod: "code -r",
       recentEvents: [...this.recentEvents],
     };
   }
@@ -68,7 +70,12 @@ export class CodexImageLinkMonitor implements vscode.Disposable {
         const stat = await vscode.workspace.fs.stat(vscode.Uri.file(target));
         return (stat.type & vscode.FileType.File) !== 0;
       },
-      open: (target) => vscode.commands.executeCommand("vscode.open", vscode.Uri.file(target), { preview: false }),
+      open: (target) => openWithCodeCli({
+        appRoot: vscode.env.appRoot,
+        remote: !!vscode.env.remoteName,
+        platform: process.platform,
+        execPath: process.execPath,
+      }, target),
     });
     try {
       await tail.prime();

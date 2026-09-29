@@ -28,11 +28,13 @@ Agent Center 用于将 AI 编码 Agent 的信息与实用功能集中到 VS Code
 
 ## 打开 Codex 对话中的图片
 
-更新 Agent Center 并重新加载 VS Code 窗口后，直接点击 Codex 对话中原有的图片绝对路径链接。如果 Codex 记录了受支持的打开失败日志，Agent Center 会将图片打开为普通编辑器标签页。无需专用链接，也无需修改 Codex。支持 PNG、JPEG、GIF、WebP、BMP 和 ICO。
+更新 Agent Center 并重新加载 VS Code 窗口后，直接点击 Codex 对话中原有的文件绝对路径链接。如果 Codex 记录了受支持的打开失败日志，Agent Center 会执行 `code -r` 打开该路径。无需专用链接，也无需修改 Codex。支持 PNG、JPEG、GIF、WebP、BMP、ICO、PDF 和 SVG。PDF 预览需要安装相应的查看器扩展；SVG 等文件按照你配置的默认编辑器打开。
+
+Agent Center 在后台启动当前 VS Code 安装自带的命令行工具，将路径作为独立参数传入，不会向你的终端输入命令。远程会话沿用当前扩展宿主的 CLI 连接。Windows 上直接运行 `code.cmd` 对应的 CLI 入口，保留路径中的空格、中文和特殊字符。执行失败可在 Show Diagnostics 中查看。
 
 使用 Remote SSH、WSL 或开发容器时，将 Agent Center 安装到 Codex 处理该文件的工作区环境中。两个扩展必须位于同一窗口、同一扩展宿主；此功能不会将远程路径转换为 Windows 本地路径。如果安装过单独的实验扩展 **Codex Image Opener**，请先禁用或卸载它，以免重复处理。
 
-这是根据 Codex `26.917.62051` 中检查到的失败日志格式实现的兼容方案，并非 Codex 公开的点击事件接口。暂不处理相对路径、网页 URL、SVG 和 PDF；Codex 后续更改日志格式时可能需要适配。自动测试覆盖了日志到编辑器命令的流程，VS Code API 使用模拟对象；远程 VS Code 会话中的真实点击尚未验证。
+这是根据 Codex `26.917.62051` 中检查到的失败日志格式实现的兼容方案，并非 Codex 公开的点击事件接口。暂不处理相对路径和网页 URL；Codex 后续更改日志格式时可能需要适配。自动测试使用模拟 VS Code API 验证日志补开流程，并覆盖 CLI 定位和真实子进程的路径参数传递；远程 VS Code 会话中的真实点击尚未验证。
 
 Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时跳过历史记录，仅在窗口获得焦点且工作区受信任时打开图片。它不会复制、移动或写入该日志。补开诊断只在内存中保留最近 40 条，原始日志仍由 VS Code 管理。
 
@@ -42,6 +44,11 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 - `agentStatus.codexImageLinks.logFile`：高级设置，手动指定当前窗口、当前扩展宿主中的 `Codex.log` 绝对路径；留空自动定位。它指定读取来源，不会在该路径创建新日志。
 
 ## 更新日志
+
+### 0.1.5 - 2026-09-29
+
+- 补开方式改为通过 VS Code 自带 CLI 执行 `code -r`，支持远程窗口连接信息传递及进程执行时限。
+- 新增 PDF、SVG 链接支持，以及 CLI 执行失败诊断。
 
 ### 0.1.4 - 2026-09-29
 

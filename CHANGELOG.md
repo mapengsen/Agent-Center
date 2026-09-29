@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.5 - 2026-09-29
+
+### Changed / 变更
+
+- Recovery now runs `code -r` via the current installation's bundled CLI instead of the `vscode.open` API. Paths are passed as literal arguments without a command shell, and remote sessions use their extension host's CLI connection.
+- 补开方式由 `vscode.open` API 改为运行当前安装自带 CLI 的 `code -r`；路径作为独立参数传入，远程会话使用对应扩展宿主的 CLI 连接。
+- Added PDF and SVG recovery, a process timeout, and CLI failure diagnostics. PDF rendering depends on the installed viewer; SVG follows the default editor configuration.
+- 新增 PDF、SVG 补开、进程超时限制及 CLI 失败诊断。PDF 预览依赖已安装的查看器，SVG 按默认编辑器配置打开。
+
 ## 0.1.4 - 2026-09-29
 
 ### Added / 新增

@@ -23,7 +23,7 @@ async function temporary(t: TestContext): Promise<string> {
 }
 
 test("recognizes only exact absolute-image failures, including spaces and Unicode", () => {
-  for (const name of ["image.png", "图 表.PNG", "a.jpg", "a.jpeg", "a.gif", "a.webp", "a.bmp", "a.ico"]) {
+  for (const name of ["image.png", "图 表.PNG", "a.jpg", "a.jpeg", "a.gif", "a.webp", "a.bmp", "a.ico", "论文 图.PDF", "a.svg"]) {
     const target = "/project/" + name;
     assert.equal(parseCodexImageOpenFailure(failure(target), "linux"), target);
   }
@@ -31,7 +31,7 @@ test("recognizes only exact absolute-image failures, including spaces and Unicod
     assert.equal(parseCodexImageOpenFailure(failure(target), "win32"), target);
   }
   assert.equal(parseCodexImageOpenFailure(failure("/project/image.png"), "win32"), undefined);
-  for (const target of ["relative.png", "/a/source.py", "/a/image.png.exe", "https://example.org/a.png", "/a/a\n.png", "/a/a.svg", "/a/a.pdf"]) {
+  for (const target of ["relative.png", "/a/source.py", "/a/image.png.exe", "https://example.org/a.png", "/a/a\n.png", "/a/a.pdf.exe", "https://example.org/a.svg"]) {
     assert.equal(parseCodexImageOpenFailure(failure(target), "linux"), undefined, target);
   }
   for (const line of [
@@ -145,16 +145,18 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
       getConfiguration: () => ({ get: (key: string, fallback: unknown) => key === "enabled" ? enabled : key === "logFile" ? override : fallback }),
       fs: { stat: async (resource: { fsPath: string }) => ({ type: (await fs.stat(resource.fsPath)).isFile() ? 1 : 2 }) },
     },
-    commands: { executeCommand: async (...args: unknown[]) => { calls.push(args); } },
+    commands: { executeCommand: async () => assert.fail("Must use the CLI, not vscode.open") },
     extensions: { getExtension: (id: string) => id === "openai.chatgpt" ? { packageJSON: { version: "26.917.62051" } } : prototype ? {} : undefined },
-    env: { remoteName: "ssh-remote" }, Uri: { file: uri }, FileType: { File: 1 },
+    env: { remoteName: "ssh-remote", appRoot: path.join(root, "vscode-server") }, Uri: { file: uri }, FileType: { File: 1 },
   };
   const entry = path.resolve(__dirname, "../codexImageLinks.js");
   const source = await fs.readFile(entry, "utf8");
   const nativeRequire = createRequire(entry);
   const module = { exports: {} as { CodexImageLinkMonitor: new (context: unknown) => CodexImageLinkMonitor } };
   vm.runInNewContext(source, {
-    require: (name: string) => name === "vscode" ? vscode : nativeRequire(name),
+    require: (name: string) => name === "vscode" ? vscode : name === "./codeCli" ? {
+      openWithCodeCli: async (...args: unknown[]) => { calls.push(args); },
+    } : nativeRequire(name),
     module, exports: module.exports, process,
     setInterval: (callback: () => void) => { tick = callback; return { unref() {} }; },
     clearInterval: () => { tick = undefined; },
@@ -177,18 +179,27 @@ test("monitor opens appended failures, bounds diagnostics, and honors disable/tr
   tick!();
   await until(() => diagnostics().opened === 1);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0][0], "vscode.open");
-  assert.equal((calls[0][1] as { fsPath: string }).fsPath, target);
-  assert.equal((calls[0][2] as { preview: boolean }).preview, false);
+  assert.equal((calls[0][0] as { appRoot: string }).appRoot, vscode.env.appRoot);
+  assert.equal((calls[0][0] as { remote: boolean }).remote, true);
+  assert.equal(calls[0][1], target);
   assert.deepEqual(await fs.readFile(target), bytes);
   assert.equal(await fs.readFile(log, "utf8"), failure(path.join(root, "old.png")) + "\n" + appended);
+  for (const extension of ["pdf", "svg"]) {
+    const document = path.join(root, `论文 图.${extension}`);
+    await fs.writeFile(document, "test document");
+    await fs.appendFile(log, failure(document) + "\n");
+  }
+  tick!();
+  await until(() => diagnostics().opened === 3);
+  assert.equal(calls[1][1], path.join(root, "论文 图.pdf"));
+  assert.equal(calls[2][1], path.join(root, "论文 图.svg"));
   // Missing files produce diagnostics without opening editors or writing logs.
   await fs.appendFile(log, Array.from({ length: 45 }, (_, i) => failure(path.join(root, `missing-${i}.png`))).join("\n") + "\n");
   tick!();
   await until(() => diagnostics().recentEvents.length === 40);
   await monitor.restart(); // Cancels the old generation and seeks to EOF.
   assert.ok(diagnostics().recentEvents.length <= 40);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 3);
   enabled = false;
   await monitor.restart();
   assert.equal(diagnostics().status, "disabled");

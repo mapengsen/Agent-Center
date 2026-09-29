@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex and Claude usage details in the status bar, plus automatic recovery for Codex image links.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -84,7 +84,7 @@
         "agentStatus.codexImageLinks.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "点击 Codex 图片链接未打开时尝试自动补开。实验功能，支持同一运行环境中的绝对图片路径。"
+          "description": "点击 Codex 图片、PDF 或 SVG 链接未打开时，执行 code -r 尝试补开。实验功能，支持同一运行环境中的绝对路径。"
         },
         "agentStatus.codexImageLinks.logFile": {
           "type": "string",
@@ -169,7 +169,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },
