@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.8 - 2026-09-30
+
+### Changed / 变更
+
+- Removed `.txt` from the default `code -r` recovery formats; users can still add it explicitly in `agentStatus.codexImageLinks.extensions`.
+- 从默认 `code -r` 补开格式中移除 `.txt`；如需使用，仍可在 `agentStatus.codexImageLinks.extensions` 中显式加入。
+
 ## 0.1.7 - 2026-09-29
 
 ### Added / 新增

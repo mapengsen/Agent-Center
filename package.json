@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex and Claude usage details in the status bar, plus file-link recovery through the VS Code CLI.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -104,7 +104,7 @@
           "default": [
             ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".svg",
             ".md", ".markdown", ".mdx", ".rst", ".csv", ".tsv", ".html", ".htm", ".ipynb",
-            ".tex", ".bib", ".txt", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
+            ".tex", ".bib", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
             ".docx", ".xlsx", ".pptx"
           ],
           "description": "使用 code -r 补开的文件扩展名，同时控制失败日志与文本标签页两条补开流程。大小写不敏感，可带或不带前导点；列表为空则不处理任何格式。预览方式取决于 VS Code 默认编辑器及已安装的查看器扩展。"

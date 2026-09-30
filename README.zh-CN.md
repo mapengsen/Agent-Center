@@ -28,7 +28,7 @@ Agent Center 用于将 AI 编码 Agent 的信息与实用功能集中到 VS Code
 
 ## 打开 Codex 对话中的文件
 
-更新 Agent Center 并重新加载 VS Code 窗口后，直接点击 Codex 对话中原有的文件绝对路径链接。如果 Codex 记录了受支持的打开失败日志，Agent Center 会执行 `code -r` 打开该路径。无需专用链接，也无需修改 Codex。默认支持以下 31 种扩展名：
+更新 Agent Center 并重新加载 VS Code 窗口后，直接点击 Codex 对话中原有的文件绝对路径链接。如果 Codex 记录了受支持的打开失败日志，Agent Center 会执行 `code -r` 打开该路径。无需专用链接，也无需修改 Codex。默认支持以下 30 种扩展名：
 
 | 类别 | 扩展名 |
 | --- | --- |
@@ -38,7 +38,7 @@ Agent Center 用于将 AI 编码 Agent 的信息与实用功能集中到 VS Code
 | 网页 | `.html`、`.htm` |
 | Notebook | `.ipynb` |
 | 科研文档 | `.tex`、`.bib` |
-| 普通文本、配置 | `.txt`、`.log`、`.json`、`.jsonl`、`.yaml`、`.yml`、`.toml`、`.xml` |
+| 配置与日志 | `.log`、`.json`、`.jsonl`、`.yaml`、`.yml`、`.toml`、`.xml` |
 | Office 文档 | `.docx`、`.xlsx`、`.pptx` |
 
 打开效果与手动执行 `code -r` 一致，由默认编辑器决定。PDF、Office 预览需要相应的查看器扩展；Markdown、CSV 和 HTML 不会被强制切换为渲染预览、表格或浏览器。
@@ -63,6 +63,10 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 - `agentStatus.codexImageLinks.logFile`：高级设置，手动指定当前窗口、当前扩展宿主中的 `Codex.log` 绝对路径；留空自动定位。它指定读取来源，不会在该路径创建新日志。
 
 ## 更新日志
+
+### 0.1.8 - 2026-09-30
+
+- 从默认 `code -r` 补开格式中移除 `.txt`，其他已配置格式保持不变。
 
 ### 0.1.7 - 2026-09-29
 

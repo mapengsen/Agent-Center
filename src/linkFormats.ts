@@ -3,7 +3,7 @@ import * as path from "node:path";
 export const DEFAULT_LINK_EXTENSIONS: readonly string[] = [
   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".svg",
   ".md", ".markdown", ".mdx", ".rst", ".csv", ".tsv", ".html", ".htm", ".ipynb",
-  ".tex", ".bib", ".txt", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
+  ".tex", ".bib", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
   ".docx", ".xlsx", ".pptx",
 ];
 

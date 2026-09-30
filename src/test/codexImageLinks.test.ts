@@ -47,12 +47,14 @@ test("recognizes only exact absolute-image failures, including spaces and Unicod
 test("every requested format is enabled in both runtime and settings defaults", async () => {
   const expected = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".svg",
     ".md", ".markdown", ".mdx", ".rst", ".csv", ".tsv", ".html", ".htm", ".ipynb",
-    ".tex", ".bib", ".txt", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
+    ".tex", ".bib", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
     ".docx", ".xlsx", ".pptx"];
   assert.deepEqual(DEFAULT_LINK_EXTENSIONS, expected);
   const manifest = JSON.parse(await fs.readFile(path.resolve(__dirname, "../../package.json"), "utf8"));
   assert.deepEqual(manifest.contributes.configuration.properties["agentStatus.codexImageLinks.extensions"].default, expected);
   assert.equal(DEFAULT_LINK_EXTENSIONS.filter(ext => ext === ".toml").length, 1);
+  assert.equal(DEFAULT_LINK_EXTENSIONS.includes(".txt"), false);
+  assert.equal(manifest.contributes.configuration.properties["agentStatus.codexImageLinks.extensions"].default.includes(".txt"), false);
   for (const extension of expected) {
     const target = "/project/中文 文件" + extension.toUpperCase();
     assert.equal(parseCodexImageOpenFailure(failure(target), "linux"), target);

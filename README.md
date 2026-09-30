@@ -28,7 +28,7 @@ Agent Center brings AI coding-agent insights and utilities into VS Code. It disp
 
 ## Opening files from Codex
 
-Update Agent Center, reload the VS Code window, and click an existing absolute file-path link in Codex. If Codex records the supported open failure, Agent Center runs `code -r` with that path. No special link format or changes to Codex are required. These 31 extensions are enabled by default:
+Update Agent Center, reload the VS Code window, and click an existing absolute file-path link in Codex. If Codex records the supported open failure, Agent Center runs `code -r` with that path. No special link format or changes to Codex are required. These 30 extensions are enabled by default:
 
 | Category | Extensions |
 | --- | --- |
@@ -38,7 +38,7 @@ Update Agent Center, reload the VS Code window, and click an existing absolute f
 | Web pages | `.html`, `.htm` |
 | Notebooks | `.ipynb` |
 | Research documents | `.tex`, `.bib` |
-| Text and configuration | `.txt`, `.log`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml` |
+| Configuration and logs | `.log`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml` |
 | Office documents | `.docx`, `.xlsx`, `.pptx` |
 
 Files use the same default editor as a manual `code -r` command. PDF and Office preview require suitable viewer extensions; Markdown, CSV, and HTML are not forced into a rendered preview, table, or browser.
@@ -63,6 +63,10 @@ Agent Center reads only new entries from the current window's existing `Codex.lo
 - `agentStatus.codexImageLinks.logFile`: advanced override for the absolute path to the current window and extension host's `Codex.log`. Leave empty for automatic detection. It selects a file to read, not a destination for new logs.
 
 ## Changelog
+
+### 0.1.8 - 2026-09-30
+
+- Removed `.txt` from the default `code -r` recovery formats. Other configured formats are unchanged.
 
 ### 0.1.7 - 2026-09-29
 

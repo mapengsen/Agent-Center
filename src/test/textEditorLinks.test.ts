@@ -165,7 +165,7 @@ test("a missing CLI preserves the source tab and a cancelled close never launche
 });
 
 test("a CLI that returns another text tab cannot create a close/reopen loop", async t => {
-  for (const extension of ["pdf", "md", "csv", "toml", "json", "txt"]) {
+  for (const extension of ["pdf", "md", "csv", "toml", "json", "log"]) {
     const h = await setup(t, extension);
     h.state.onOpen = () => { h.state.now += 6000; h.showText(); };
     await h.listener.recoverActiveEditor();
