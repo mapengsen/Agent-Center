@@ -2,29 +2,96 @@
 
 语言：<a href="https://github.com/mapengsen/Agent-Center/tree/main">English（默认）</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center 用于将 AI 编码 Agent 的信息与实用功能集中到 VS Code 中，支持在状态栏显示 Codex 和 Claude 的使用额度，以及辅助打开 Codex 对话中的文件链接。
+Agent Center 将 Codex / Claude 使用额度、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
 **Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
 
-**我的所有插件推荐：**
+## 全部功能
 
-1. **Notifyer Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion)
-2. **Agent Center**：[marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
+| 功能 | 可以做什么 |
+| --- | --- |
+| Codex 使用额度 | 查看剩余或已使用百分比、短窗口与长窗口、重置时间，以及账户邮箱和套餐。 |
+| Claude 使用额度 | 查看接口返回的 5 小时、7 天、Opus、Sonnet 额度窗口，以及订阅和重置时间。 |
+| 额度显示与刷新 | 为两个服务分别选择剩余/已使用模式，用彩色标记查看使用程度；支持点击刷新、定时刷新和失败重试。 |
+| VS Code 联网检测 | 从扩展宿主只访问 Google 公开网页；收到任意 HTTP 响应显示 `✅️`，无响应显示 `❌`。图标放在 Clash 地球图标前，启动时检测一次，之后默认每 **5 小时**一次，也可手动检测。 |
+| Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
+| 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
+| 添加、切换、删除订阅 | 直接粘贴链接自动识别名称，可仅保存或立即切换，显示当前订阅，并可删除任意订阅。删除活动订阅时自动切换到下一个已启用订阅；无可用替代时停止 Clash。需要兼容的 clash-for-linux。 |
+| Codex 文件链接补开 | 通过 `code -r` 补开支持的绝对路径链接，默认 **30 种格式**，包含图片、PDF、SVG、Markdown、CSV、TOML 和 Office，可自定义列表；覆盖打开失败与未修改文本标签页，保留未保存修改并防止重复重开。 |
+| 远程环境、设置与诊断 | 在当前本地或远程扩展宿主运行，支持功能开关、凭据与代理配置，并查看额度、联网、Clash 和文件补开的诊断结果。 |
 
-## 主要功能
+## 开始使用
 
-- 使用 `5% left | 8-20 11:24` 或 `5% used | 8-20 11:24` 这样的紧凑单行格式。
-- 显示 Codex 短窗口、长窗口、账户邮箱和套餐信息。
-- 显示 Claude 5 小时、7 天、Opus 与 Sonnet 窗口信息。
-- 鼠标悬停信息使用按类别区分的彩色 Emoji 标记状态栏含义、账户、套餐、额度窗口、重置时间、最后更新时间和操作入口；百分比标记会随着已使用比例升高依次变为绿、黄、橙、红。（状态栏重置时间使用 Agent Center 运行环境的时区；如果远程服务器和 Windows 时区不同，显示的时钟时间也可能不同。）
-- 支持剩余/已使用两种显示模式，并可点击状态栏立即刷新。
-- 只有手动请求期间显示旋转的“刷新中”动画；自动刷新时保持正常状态显示。
-- 启动时立即刷新，随后每 60 秒自动刷新一次，共 3 次；之后使用默认 15 分钟的常规间隔。常规阶段刷新失败时每 30 秒重试，单轮最多尝试 5 次。
-- 通过 `code -r` 自动补开支持格式的 Codex 文件链接（实验功能，默认启用）。
+1. 从 [VS Code 插件市场](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)安装 **Agent Center**，重新加载窗口。Remote SSH、WSL 或容器窗口需要安装到相应工作区环境。
+2. 查看额度时，在同一环境通过 `codex login` 或 `claude /login` 登录。插件读取该环境已有的 CLI 凭据；某个服务没有可用凭据时，会隐藏对应额度项。
+3. Google 联网检测无需 Clash 或 API Key。节点显示与切换需要正在运行且控制器可访问的 Clash/Mihomo；订阅管理还需要兼容的 clash-for-linux。
+4. 悬停额度项查看详情，点击额度项刷新。悬停或点击 Google/Clash 状态项，在右下角状态栏上方展开原生卡片，操作联网检测、节点和订阅。
+
+| 自动任务 | 默认频率 | 手动入口 |
+| --- | --- | --- |
+| Codex / Claude 额度 | 启动时刷新，之后每 60 秒再刷新 3 次，再按 **15 分钟**间隔刷新；常规阶段失败每 30 秒重试，单轮最多 5 次。 | 点击对应额度项，或使用刷新命令。 |
+| VS Code 扩展宿主 → Google | 启动时检测一次，之后每 **5 小时**一次。 | 悬浮卡片中的“立即检测联网”。 |
+| Clash 节点 → Google | 启动时测速，之后每 **5 分钟**一次；切换节点或订阅后也会测速。 | 悬浮卡片中的“刷新测速”。 |
 
 ![Agent Center 状态栏预览](image.png)
+
+上图展示额度状态项。联网与 Clash 合并显示的示例为 `✅️ 🌐 √ Google（1605 ms）`：最前面的图标表示扩展宿主检测结果，后面的延迟来自独立的 Clash 节点测速。
+
+## Codex 与 Claude 使用额度
+
+状态栏采用 `5% left | 10-17 11:24` 或 `5% used | 10-17 11:24` 的紧凑格式，两个服务可分别选择剩余或已使用模式。悬停显示百分比与额度窗口的含义、账户或会话、套餐、重置时间、最后更新和操作入口。彩色 Emoji 根据已使用比例从绿、黄、橙变为红。这里的额度是时间窗口中的百分比，不是绝对 Token 数或请求次数。
+
+Codex 优先显示短窗口，短窗口不可用时显示长窗口；Claude 优先显示 5 小时窗口，悬停中显示接口提供的其他 7 天、Opus 和 Sonnet 窗口。重置时间使用插件运行环境的时区，远程服务器与本机时区不同时可能显示不同时间。手动额度刷新显示动画，后台刷新保留当前状态。
+
+Codex 默认读取 `CODEX_HOME/auth.json` 或 `~/.codex/auth.json`，Claude 默认读取 `CLAUDE_CONFIG_DIR/.credentials.json` 或 `~/.claude/.credentials.json`。可用 `agentStatus.codex.credentialsPath`、`agentStatus.claude.credentialsPath` 覆盖路径；各服务还有 `enabled`、`usageDisplayMode`、`usageUpdateIntervalSeconds` 和可选的 HTTP/HTTPS `proxyUrl` 设置。额度功能使用已有登录会话请求服务的额度接口；Google 联网检测独立运行，无需登录。
+
+## Google 网页联网检测
+
+从当前 VS Code 扩展宿主访问 `https://www.google.com/`，在原有 Clash 测速状态项的地球图标前只显示一个联网图标，例如 `✅️ 🌐 √ Google（1605 ms）`：
+
+- `✅️`：收到任意 HTTP 响应，包括 200、跳转、403、429 或 5xx。
+- `❌`：未收到 HTTP 响应，包括超时、DNS、连接或证书错误。
+
+启动后立即检测，之后默认每 5 小时检测一次。悬停或点击同一状态项，展开右下角原生卡片，可查看 HTTP 状态、耗时、检测位置和时间，并“立即检测联网”；也可运行 **Agent Center: Test Google Website Connectivity**。不再创建独立的 ChatGPT 状态项，没有 Clash 时只显示联网图标。检测期间保留上次图标，首次收到结果前不显示图标。
+
+新增联网检测只访问 Google 公开网页，不访问 ChatGPT、Claude、额度或聊天 API，不读取登录凭据，无需 API Key。收到响应头后立即停止，不下载页面，不跟随任何跳转。`✅️` 只表示收到 HTTP 响应，不保证页面功能可用。它与通过 Clash 核心进行的节点测速独立，两者可能有不同结果。原有 Codex/Claude 额度功能保留各自的请求和开关。
+
+请求使用 VS Code 扩展宿主提供的 Node HTTP(S) 传输及其代理、证书支持，沿用当前生效的 `http.proxy`、`http.proxySupport` 和环境代理处理。在 Remote SSH / WSL / 容器窗口中检测远程扩展宿主，在普通窗口中检测本机。终端后来设置的环境变量不一定传给已运行的扩展宿主；结果代表 Agent Center 的网页请求，其他扩展以各自实际请求为准。
+
+可通过 `agentStatus.network.enabled` 关闭，`testTimeoutMs` 设置总超时（默认 15000 毫秒），`updateIntervalSeconds` 设置检测间隔（默认 18000 秒，即 5 小时；Clash 节点测速仍默认每 5 分钟一次）。只在受信任工作区检测；关闭功能或卸载时会取消未完成的请求。**Agent Center: Show Diagnostics** 的 `network` 字段提供最近结果，不记录代理密码。
+
+## Clash 节点与 Google 延迟
+
+将 Agent Center 安装到 Remote SSH 的远程环境并重新加载窗口。Linux/WSL 上优先从正在运行的 Clash/Mihomo 进程读取 `-f` 配置路径或 `-d` 数据目录，支持自定义安装位置。也会读取环境变量、PATH 中的 Clash 命令入口及 shell 中登记的 clashctl 路径，最后查找 ~/clash-for-linux/runtime/config.yaml、~/.config/mihomo/config.yaml 等常见位置。自动读取控制器地址和密钥，无需逐台填写安装路径。
+
+- 状态栏显示 **√ Google（3349 ms）**；无法访问、超时或无有效延迟时显示 **× 超时**。
+- 悬停显示当前最终节点、完整选择链和路由模式；规则模式显示所选策略组，其他规则可能使用其他组。
+- 点击状态栏立即展开右下角状态项上方的原生悬浮卡片，与鼠标悬停时显示相同的节点、测速、订阅和操作入口。点击卡片中的节点可切换，点击“全部节点”可搜索完整列表。切换后校验结果并自动重新测速。
+- 使用与 clashtest 一致的 Google 测试地址 https://www.gstatic.com/generate_204，默认超时 8 秒。显示的是连接延迟（ms），不是下载带宽。
+- 默认每 5 分钟（300 秒）自动刷新并测速；手动刷新及切换节点或订阅后立即测速。未发现 Clash 时仅显示已启用的独立联网图标；控制器故障显示“Clash 未连接”，可在悬停中重试。
+
+通常将 configPath、installDirectory、controller 和 secret 留空即可。存在多个 Clash 实例、进程信息不可读或控制器位于另一环境时，可在**远程设置**用 agentStatus.clash.configPath 明确选择配置；已有手动设置优先于自动发现。仅填写 installDirectory 时也会尝试读取其 runtime/config.yaml。group 留空时根据配置顺序选择手动策略组，全局模式读取 GLOBAL，直连模式读取 DIRECT。多个策略组时可指定 group。testTimeoutMs 和 updateIntervalSeconds 控制测速时限和刷新频率，enabled 可关闭此功能。
+
+发现过程只读取当前扩展宿主的进程参数和命令入口，不执行 shell 启动脚本，不搜索整个磁盘，也不修改 Clash 服务或写回安装路径。服务重启或位置变化后，下次刷新重新识别；订阅目录从发现的运行配置推导。多个实例默认按进程 ID 顺序选择首个可读取的配置，可用手动设置指定目标。
+
+控制器请求在扩展宿主执行，远程窗口的 127.0.0.1 指远程主机。自动识别的 0.0.0.0 监听地址转换为回环地址。节点切换通过 API 完成，控制器自行决定是否保存选择。诊断包含节点和错误，不输出密钥。
+
+命令面板：**Agent Center: Refresh Clash Node Speed**、**Agent Center: Choose Clash Node**、**Agent Center: Show Diagnostics**（查看 clash 字段）。
+
+### 添加、切换与删除订阅（clash-for-linux）
+
+在状态栏悬停菜单点击“添加订阅”“切换订阅”或“删除订阅”。也可在命令面板执行 **Agent Center: Add Clash Subscription**、**Agent Center: Choose Clash Subscription** 或 **Agent Center: Remove Clash Subscription**。
+
+- 切换列表优先显示订阅服务提供的名称（响应头 `profile-title` 或下载文件名），无法读取时显示来源域名。下方同时显示原订阅标识和来源域名，以便区分同名订阅。打开订阅列表或添加链接时读取名称，收到响应头后停止读取，不应用配置；名称在内存缓存一小时，失败缓存五分钟，日常测速复用缓存。
+- 添加时只需粘贴 HTTP/HTTPS Clash YAML 链接，自动识别订阅名称；读取不到时使用来源域名。名称自动处理不兼容字符，重名时追加 `-2` 等后缀，再选择“保存订阅，保留当前连接”或“保存并立即切换”。仅保存时不会下载或替换当前配置。
+- 切换会调用远程 clash-for-linux 的原生 `use` 命令，下载、生成配置并按其服务管理方式重启 Clash；期间代理连接可能短暂中断。失败时尝试恢复原订阅和手动节点选择，并明确报告恢复结果。
+- 所有订阅（包括 `default`）均可确认删除。删除当前订阅时，先按列表顺序切换到下一个已启用的订阅，末尾回到开头；切换失败时保留原订阅。删除非当前订阅时保留当前连接。没有已启用的备用订阅时，先停止 Clash，再删除；删除最后一个订阅后列表清空，重新添加并切换订阅可再次启动。插件通过安装中的配置写入器和 `yq` 管理存储，适配原生脚本的 `default` 限制，无需修改 clash-for-linux 源码。
+- 链接输入框隐藏内容；订阅保存在原生 `runtime/subscriptions.yaml` 中，不写入插件源码、VS Code 设置或插件日志。插件通过标准输入将链接交给原生订阅写入器；后续下载由 clash-for-linux 管理。订阅持久保存；请保护服务器中的订阅文件。
+- 需要在 Linux/WSL 的扩展宿主安装兼容的 clash-for-linux（包含 `scripts/core/clashctl.sh`、`config.sh` 和 `runtime/subscriptions.yaml`）。自动从运行配置位置、`~/clash-for-linux` 等查找；可用 `agentStatus.clash.installDirectory` 指定目录。只有 Clash 控制器 API 的安装不支持此订阅管理功能。
+
+悬停会显示当前订阅的已缓存名称（或来源域名）和原标识，选择节点与切换订阅使用独立入口。
 
 ## 打开 Codex 对话中的文件
 
@@ -62,7 +129,69 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 - **Agent Center: Restart Codex File Link Listener**：排查问题后重启监听，然后重新点击文件链接。
 - `agentStatus.codexImageLinks.logFile`：高级设置，手动指定当前窗口、当前扩展宿主中的 `Codex.log` 绝对路径；留空自动定位。它指定读取来源，不会在该路径创建新日志。
 
+## 全部命令
+
+按 `Ctrl+Shift+P` / `Cmd+Shift+P` 打开命令面板，搜索 **Agent Center**。插件提供的全部命令如下：
+
+| 命令 | 用途 |
+| --- | --- |
+| Agent Center: Refresh Codex Usage | 立即刷新当前环境的 Codex 额度。 |
+| Agent Center: Choose Codex Usage Display | 选择 Codex 显示剩余或已使用百分比。 |
+| Agent Center: Refresh Claude Usage | 立即刷新当前环境的 Claude 额度。 |
+| Agent Center: Choose Claude Usage Display | 选择 Claude 显示剩余或已使用百分比。 |
+| Agent Center: Test Google Website Connectivity | 立即运行扩展宿主的 Google 联网检测。 |
+| Agent Center: Refresh Clash Node Speed | 刷新 Clash 状态并检测当前选择节点的 Google 延迟。 |
+| Agent Center: Choose Clash Node | 搜索并切换手动策略组中的节点。 |
+| Agent Center: Add Clash Subscription | 粘贴链接识别名称，再选择保存或立即切换。 |
+| Agent Center: Choose Clash Subscription | 选择并应用已保存订阅。 |
+| Agent Center: Remove Clash Subscription | 确认删除订阅，必要时自动切换或停止 Clash。 |
+| Agent Center: Restart Codex File Link Listener | 重启日志定位与文本标签页补开监听。 |
+| Agent Center: Show Diagnostics | 在 Agent Center 输出面板查看全部功能的诊断结果。 |
+| Agent Center: Open Settings | 打开插件设置。 |
+
+## 功能设置与诊断
+
+在设置中搜索 **Agent Center**，或运行 **Agent Center: Open Settings**。各项功能均默认启用，可独立关闭：
+
+| 设置分组 | 启用/关闭 | 其他选项 |
+| --- | --- | --- |
+| Codex 额度 | `agentStatus.codex.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
+| Claude 额度 | `agentStatus.claude.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
+| 扩展宿主 Google 联网检测 | `agentStatus.network.enabled` | `testTimeoutMs`、`updateIntervalSeconds` |
+| Clash 节点与订阅 | `agentStatus.clash.enabled` | `configPath`、`controller`、`secret`、`installDirectory`、`group`、`testTimeoutMs`、`updateIntervalSeconds` |
+| Codex 文件链接补开 | `agentStatus.codexImageLinks.enabled` | `extensions`、`reopenTextDocuments`、`logFile` |
+
+最后一列的选项使用本行对应的设置前缀，例如 `agentStatus.network.updateIntervalSeconds`。Remote SSH、WSL 和容器中使用对应远程环境的设置与文件路径。未显式填写 Agent Center 额度设置时，会兼容读取已有的 Notifyer 旧版额度设置。
+
+**Agent Center: Show Diagnostics** 会在输出面板显示 `codex`、`claude`、`network`、`clash` 和 `codexImageLinks`，用于查看运行环境、最后检测结果、发现的配置和最近文件补开记录。输出不包含访问令牌、代理密码、控制器密钥或完整私密订阅链接。文件补开、联网检测和 Clash 操作需要受信任工作区。
+
+## 相关插件
+
+[Notifyer](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion) 是同一发布者的另一个扩展。
+
 ## 更新日志
+
+各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.22 - 2026-10-17
+
+- 在 GitHub 和插件市场的中英文主页补齐全部功能、使用方式、刷新频率、设置及所有命令。
+
+### 0.1.21 - 2026-10-17
+
+- 扩展宿主的 Google 联网检测改为默认每 5 小时一次；Clash 节点测速仍默认每 5 分钟一次。
+
+### 0.1.20 - 2026-10-17
+
+- 在 Clash 地球图标前以单个 `✅️` / `❌` 显示 Google 联网结果，收到任意 HTTP 响应即视为连通。
+
+### 0.1.10 - 2026-10-15
+
+- 新增 clash-for-linux 订阅添加、保存或立即切换、当前订阅显示，以及切换失败后的恢复处理。
+
+### 0.1.9 - 2026-10-15
+
+- 新增 Clash/Mihomo Google 延迟、当前节点悬停提示和一键切换，支持自动读取远程配置。
 
 ### 0.1.8 - 2026-09-30
 

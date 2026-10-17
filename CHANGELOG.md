@@ -1,5 +1,114 @@
 # Changelog / 更新日志
 
+## 0.1.22 - 2026-10-17
+
+### Documentation / 文档
+
+- Expand the English and Chinese homepages with the complete feature overview, setup, Codex/Claude quotas, separate five-hour connectivity and five-minute Clash schedules, node and subscription operations, file-link recovery, all commands, settings and diagnostics.
+- 中英文主页补齐全部功能总览、使用步骤、Codex/Claude 额度、五小时联网检测与五分钟 Clash 测速、节点和订阅操作、文件链接补开、所有命令、设置与诊断。
+
+## 0.1.21 - 2026-10-17
+
+### Changed / 变更
+
+- Check Google connectivity from the VS Code extension host at startup and every five hours by default (18000 seconds), while preserving manual checks and the independent Clash node-test interval.
+- VS Code 扩展宿主的 Google 联网检测改为启动时检测一次、之后默认每 5 小时（18000 秒）一次；保留手动检测，Clash 节点测速间隔保持独立。
+
+## 0.1.20 - 2026-10-17
+
+### Changed / 变更
+
+- Change extension-host connectivity detection to the Google public website. Any HTTP response counts as connected; stop at headers without following redirects. Merge the result into a single ✅️ / ❌ prefix before the existing Clash globe instead of a separate ChatGPT status item; keep details and manual detection in the shared hover.
+- 将扩展宿主联网检测改为只访问 Google 公开网页，收到任意 HTTP 响应即视为连通，不下载页面或跟随跳转。移除独立 ChatGPT 状态项，在原有 Clash 地球图标前只显示 ✅️ / ❌，详情和立即检测入口合并到原生悬浮卡片。
+
+## 0.1.19 - 2026-10-16
+
+### Added / 新增
+
+- Add an independent ChatGPT public-website connectivity check from the current VS Code extension host, at startup and every five minutes. Show HTTP restrictions, browser challenges and network errors separately, with a native hover card and manual refresh. No login credentials, API keys or authenticated API requests are needed.
+- 新增独立的 ChatGPT 公开网页联网检测，在当前 VS Code 扩展宿主启动时及每五分钟执行。区分网页访问成功、HTTP 受限、人机验证和网络故障；支持右下角原生悬浮卡片与立即检测，无需登录、API Key 或鉴权 API。
+
+## 0.1.18 - 2026-10-16
+
+### Changed / 变更
+
+- Clicking the Clash status bar now opens its existing hover card above the status bar, with current-node, Google latency and subscription actions.
+- 点击 Clash 状态栏立即展开右下角原有的悬浮卡片，显示当前节点、Google 延迟及订阅操作。
+
+## 0.1.17 - 2026-10-16
+
+### Changed / 变更
+
+- Allow confirmed removal of every subscription, including `default`. Verify the next enabled source before removing the active source, preserve connections when removing inactive sources, and stop Clash when no enabled replacement remains. The final removal clears active state; adding and switching can start Clash again.
+- 所有订阅（包括 `default`）均可删除：删除当前订阅前先切换并验证下一个已启用订阅，删除非当前订阅保留连接，无可用备用订阅时停止 Clash；最后一个删除后清空活动状态，重新添加并切换可再次启动。
+
+## 0.1.16 - 2026-10-16
+
+### Changed / 变更
+
+- Clicking the Clash status bar opens a persistent details page with current nodes, Google latency and subscription actions. The hover remains available, and changes refresh the open details page.
+- 点击 Clash 状态栏打开固定详情页，显示当前节点、Google 延迟和订阅管理；保留悬停操作，状态变化同步更新详情页。
+- Show every subscription in the removal picker. Mark the native `default` subscription as protected and explain the restriction when selected instead of hiding it.
+- 删除列表显示所有订阅；原生 `default` 订阅标注不可删除，点击时说明限制，不再直接隐藏。
+
+## 0.1.15 - 2026-10-16
+
+### Changed / 变更
+
+- Add Clash subscriptions by pasting only the URL. Detect the provider name from response headers, fall back to the hostname, and generate a safe, unique native name without replacing existing subscriptions.
+- 添加 Clash 订阅时只需粘贴链接，自动从响应头识别名称，读取失败时使用域名；自动处理名称格式和重名，避免覆盖已有订阅。
+
+## 0.1.14 - 2026-10-16
+
+### Added / 新增
+
+- Add confirmed Clash subscription removal from the status-bar hover and command palette. The native `default` subscription cannot be removed.
+- 新增状态栏悬停菜单和命令面板中的 Clash 订阅删除功能，删除前确认；原生 `default` 订阅不可删除。
+
+## 0.1.13 - 2026-10-15
+
+### Fixed / 修复
+
+- Discover running Linux/WSL Clash/Mihomo configs from process arguments before common paths; support literal command launchers, shell integration and environment hints without executing shell startup files. Custom installation paths no longer require per-host settings in typical deployments.
+- Linux/WSL 优先从运行进程的 -f/-d 参数识别 Clash/Mihomo 配置，兼容命令入口、shell 登记路径和环境变量；不执行 shell 启动脚本。通常无需因自定义安装目录而逐台填写设置。
+- Preserve explicit overrides, honor installDirectory for connection discovery, and rediscover restarted or moved cores on refresh. Subscription management follows the detected runtime configuration.
+- 保留手动配置优先级，installDirectory 同时用于连接发现；刷新重新识别重启或迁移的服务，订阅管理沿用自动发现的运行目录。
+
+## 0.1.12 - 2026-10-15
+
+### Changed / 变更
+
+- Resized the Marketplace icon to 512 × 512 to meet its 1 MB limit. / 将市场图标缩小为 512 × 512，以满足 1 MB 大小限制。
+- Subscription picker labels now use provider names from profile-title or Content-Disposition headers, with source hostnames as fallback. Details retain native identifiers and source hosts; hover uses cached names.
+- 切换订阅时自动读取服务提供的名称（profile-title 或文件名），读取失败时显示来源域名；同时保留原标识和来源信息，悬停复用已识别的名称。
+- Metadata is requested only when opening the subscription picker, stops after response headers, and is cached in memory for one hour (five minutes on failure). Full private URLs stay out of displayed metadata and logs.
+- 仅打开订阅列表时请求名称，收到响应头后停止读取；名称在内存缓存一小时，失败缓存五分钟，完整私密链接不进入显示信息和日志。
+
+## 0.1.11 - 2026-10-15
+
+### Changed / 变更
+
+- Changed the default Clash automatic refresh and latency-test interval from 60 to 300 seconds (5 minutes). Manual refreshes and node or subscription switches still test immediately.
+- 将 Clash 默认自动刷新和测速间隔从 60 秒改为 300 秒（5 分钟）；手动刷新及切换节点或订阅后仍立即测速。
+
+## 0.1.10 - 2026-10-15
+
+### Added / 新增
+
+- Add and switch clash-for-linux subscriptions from status-bar hover or commands. Saving can keep the active connection; switching uses the native service workflow and attempts to restore the previous subscription and manual nodes on failure.
+- 新增 clash-for-linux 订阅添加、仅保存或立即切换、当前订阅显示，以及切换失败后的原订阅和手动节点恢复。
+- Private URLs stay in the native subscription file; masked inputs, no URL command arguments or plugin logging, duplicate-name checks and a cross-window mutation lock.
+- 订阅链接只保存在原生订阅文件；输入隐藏，不进入命令参数或插件日志，并增加重名校验及跨窗口操作互斥。
+
+## 0.1.9 - 2026-10-15
+
+### Added / 新增
+
+- Added Clash/Mihomo Google latency in the status bar, final-node hover details, direct node links and a searchable switcher. Switching verifies the controller's selection and refreshes latency.
+- 新增 Clash/Mihomo 状态栏 Google 延迟、悬停最终节点与选择链、可点击的节点切换和完整搜索列表；切换后校验结果并刷新延迟。
+- Auto-discovers controller credentials in the current extension host's YAML configuration, supports Remote SSH and rule/global/direct modes, and provides refresh/configuration/diagnostic controls.
+- 从当前扩展宿主的 YAML 自动识别控制器和密钥，支持 Remote SSH、规则/全局/直连模式，以及刷新、配置和诊断。
+
 ## 0.1.8 - 2026-09-30
 
 ### Changed / 变更

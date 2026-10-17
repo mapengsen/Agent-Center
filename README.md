@@ -2,29 +2,96 @@
 
 Language: <a href="https://github.com/mapengsen/Agent-Center/tree/main">English (default)</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center brings AI coding-agent insights and utilities into VS Code. It displays Codex and Claude usage quotas in the status bar and helps open file links from Codex conversations.
+Agent Center puts Codex and Claude usage quotas, VS Code internet connectivity, Clash/Mihomo nodes and subscription management in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
 **Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
 
-**All My Plugin Recommendations:**
+## All features
 
-1. **Notifyer Plugin**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion)
-2. **Agent Center**: [marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status)
+| Feature | What you can do |
+| --- | --- |
+| Codex usage quotas | See remaining or used percentages, short/long windows, reset times, account email and plan in the status bar and hover. |
+| Claude usage quotas | Inspect 5-hour, 7-day, Opus and Sonnet windows when returned by the service, plus subscription and reset details. |
+| Quota display and refresh | Choose remaining/used mode for each provider, see colored usage markers, click to refresh, and use automatic refresh with failure retries. |
+| VS Code internet connectivity | Request only Google's public website from the extension host. Any HTTP response shows `✅️`; no response shows `❌`. The single icon sits before the Clash globe. Checks run at startup and every **5 hours**, with manual checks available. |
+| Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
+| Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
+| Add, switch and delete subscriptions | Paste a URL to detect its name, save without switching or apply immediately, view the active subscription, and delete any subscription. Deleting the active source switches to the next enabled one; without a replacement, Clash stops. Requires compatible clash-for-linux. |
+| Recover Codex file links | Open supported absolute file links with `code -r`, including images, PDF, SVG, Markdown, CSV, TOML and Office files: **30 default formats**, with a configurable list. Recover failed opens and clean text tabs; preserve unsaved edits and prevent reopen loops. |
+| Remote use, settings and diagnostics | Run in the current local or remote extension host, configure feature switches, credentials and proxies, and inspect quota, connectivity, Clash and file-link diagnostics. |
 
-## Features
+## Getting started
 
-- Compact status text such as `5% left | 8-20 11:24` or `5% used | 8-20 11:24`.
-- Codex short- and long-window details, account email, and plan type.
-- Claude 5-hour, 7-day, Opus, and Sonnet window details.
-- Structured hover details with colorful, category-specific emoji for status meaning, account, plan, usage windows, reset time, last update, and actions. Percentage markers change from green through yellow and orange to red as usage rises. (Status-bar reset times use the time zone of the environment where Agent Center is running. If a remote server and Windows use different time zones, the displayed clock time may differ.)
-- Remaining/used display modes, with click-to-refresh support directly from the status bar.
-- An animated refresh indicator during manual requests only; automatic refreshes keep the normal status display.
-- An immediate startup refresh followed by three automatic refreshes at 60-second intervals, then the regular default interval of 15 minutes. Failed regular refreshes retry every 30 seconds, up to five attempts per cycle.
-- Automatic recovery for supported Codex file links through `code -r` (experimental, enabled by default).
+1. Install **Agent Center** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-claude-agent-status) and reload the window. For Remote SSH, WSL or a container, install it in that workspace environment.
+2. For quotas, sign in with `codex login` or `claude /login` in the same environment. Agent Center reads that environment's existing CLI credentials. A provider's quota item stays hidden when its credentials are unavailable or unusable.
+3. Google connectivity works without Clash or an API key. For node status and switching, run Clash/Mihomo with an accessible controller; subscription management additionally needs compatible clash-for-linux.
+4. Hover over a quota item for details; click it to refresh. Hover over or click the Google/Clash item to open the native card above the bottom-right status bar, with network, node and subscription actions.
+
+| Automatic task | Default schedule | Manual action |
+| --- | --- | --- |
+| Codex / Claude quotas | At startup, three more checks 60 seconds apart, then every **15 minutes**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
+| VS Code host → Google | At startup, then every **5 hours**. | Choose “立即检测联网” in the hover card. |
+| Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. | Choose “刷新测速” in the hover card. |
 
 ![Agent Center status bar preview](image.png)
+
+The image shows the quota items. A combined connectivity and Clash example is `✅️ 🌐 √ Google（1605 ms）`: the leading icon is the extension-host check, and the latency is the independent Clash node test.
+
+## Codex and Claude usage quotas
+
+Status items use compact text such as `5% left | 10-17 11:24` or `5% used | 10-17 11:24`. Each provider has its own remaining/used display setting. Hover details explain the selected window and percentage, account or session, plan, reset time, last update and available actions. Colored emoji markers progress from green through yellow and orange to red as the used percentage increases. Quotas are window percentages, rather than absolute token or request counts.
+
+Codex displays the short window when available, falling back to the long window. Claude prefers its 5-hour window and shows other returned 7-day, Opus and Sonnet windows in the hover. Reset timestamps use the extension host's time zone, which can differ between a remote server and your local computer. Manual quota refreshes show an animation; background refreshes retain the current display.
+
+Credentials are read from `CODEX_HOME/auth.json` or `~/.codex/auth.json` for Codex, and `CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json` for Claude. Override them with `agentStatus.codex.credentialsPath` or `agentStatus.claude.credentialsPath`. Each provider also has `enabled`, `usageDisplayMode`, `usageUpdateIntervalSeconds` and an optional HTTP/HTTPS `proxyUrl` setting. Quota requests use the existing logged-in session and the provider's quota endpoint; the Google connectivity probe is separate and needs no login.
+
+## Google website connectivity
+
+The current VS Code extension host requests `https://www.google.com/`. A single connectivity icon appears before the globe in the existing Clash status item, for example `✅️ 🌐 √ Google（1605 ms）`:
+
+- `✅️`: any HTTP response, including 200, redirects, 403, 429 and 5xx.
+- `❌`: no HTTP response, including timeouts, DNS, connection or certificate failures.
+
+Checks run at startup and every five hours by default. Hover or click the same item to inspect HTTP status, timing, execution environment and timestamp, or choose “立即检测联网”. The command is **Agent Center: Test Google Website Connectivity**. There is no separate ChatGPT status item; without Clash only the connectivity icon is displayed. Refreshes retain the previous icon; no icon is shown before the first result.
+
+This connectivity check only contacts the Google public website, without ChatGPT, Claude, quota or chat API requests, credentials or API keys. It stops at response headers without downloading the page or following redirects. `✅️` means an HTTP response arrived; it does not establish that page features work. This is independent of Clash's core-based node test, so the two results may differ. Existing Codex/Claude quota features retain their own requests and settings.
+
+Requests use Node HTTP(S) with VS Code's extension-host proxy and certificate support, following the effective `http.proxy`, `http.proxySupport` and environment proxy handling. Remote SSH, WSL and container windows test the remote extension host; ordinary windows test the local host. Environment variables set later in a terminal may not reach an already-running extension host. This reports Agent Center's public-page access; other extensions depend on their own requests.
+
+Settings: `agentStatus.network.enabled`, `testTimeoutMs` (15000 ms by default), and `updateIntervalSeconds` (18000 seconds, or five hours, by default). The Clash node test keeps its independent five-minute default. Checks require workspace trust; disabling or disposing cancels pending requests. **Agent Center: Show Diagnostics** includes the latest result under `network` without proxy passwords.
+
+## Clash nodes and Google latency
+
+Install Agent Center in your Remote SSH environment and reload the window. On Linux/WSL it first discovers the running Clash/Mihomo core's `-f` config or `-d` data directory, supporting custom installation paths. It also checks environment hints, Clash command launchers on PATH and literal clashctl paths in shell integration files before falling back to ~/clash-for-linux/runtime/config.yaml, ~/.config/mihomo/config.yaml and common system locations. The controller address and secret are read automatically.
+
+- The status bar shows **√ Google（3349 ms）**, or **× 超时** when the delay test fails.
+- Hover to see the final node, nested selection chain and routing mode. Rule mode displays the selected proxy group; other rules may use different groups.
+- Click the status bar to immediately open the same hover card above the bottom-right status item, with current-node, latency and subscription information. Click a node to switch, or “全部节点” for the searchable full list. The selection is verified and latency refreshed afterward.
+- Tests use the same Google endpoint as clashtest, https://www.gstatic.com/generate_204, with an 8-second default timeout. This measures latency in milliseconds, rather than download bandwidth.
+- Refreshes and tests latency automatically every 5 minutes (300 seconds) by default. Manual refreshes and node or subscription switches test immediately. Without a discovered Clash service, only the independent connectivity icon is shown when enabled; controller failures provide retry actions.
+
+Usually leave configPath, installDirectory, controller and secret empty. For multiple instances, restricted process access or a controller in another environment, set **agentStatus.clash.configPath** in Remote Settings. Explicit configuration takes priority; specifying only installDirectory also checks its runtime/config.yaml. Leave group empty to choose a manual group in configuration order; global mode uses GLOBAL and direct mode uses DIRECT. Set group explicitly when you want a particular rule-mode group. testTimeoutMs, updateIntervalSeconds and enabled control timeout, refresh interval and visibility.
+
+Discovery only reads the extension host's process arguments and command registrations: it does not execute shell startup scripts, scan the entire disk, change services or persist deployment paths. Refreshes rediscover moved or restarted cores, and subscription management infers its installation from the discovered runtime config. When several cores are running, the first readable config in PID order wins; explicit settings select a particular instance.
+
+All requests run in the extension host, so 127.0.0.1 in Remote SSH refers to the remote server. Wildcard controller bind addresses are normalized to loopback. Node selections use the controller API, whose persistence behavior is managed by Clash/Mihomo. Diagnostics include nodes and errors without the controller secret.
+
+Commands: **Agent Center: Refresh Clash Node Speed**, **Agent Center: Choose Clash Node**, and **Agent Center: Show Diagnostics** (the clash field).
+
+### Add, switch and delete subscriptions (clash-for-linux)
+
+Click “添加订阅” / “切换订阅” / “删除订阅” in the status-bar hover, or run **Agent Center: Add Clash Subscription** / **Agent Center: Choose Clash Subscription** / **Agent Center: Remove Clash Subscription**.
+
+- The picker shows provider names from `profile-title` or download filenames, falling back to source hostnames. Details retain native identifiers and source hosts to distinguish duplicate names. Opening a subscription picker or adding a URL requests metadata; reading stops after headers without applying a configuration. Names are cached in memory for one hour (five minutes on failure), and routine latency refreshes reuse the cache.
+- Paste an HTTP/HTTPS Clash YAML subscription URL; the name is detected automatically, falling back to its hostname. Names are made safe for native storage and duplicates receive a suffix such as `-2`. Choose to save for later or switch immediately. Saving alone does not download or replace the active configuration.
+- Switching uses the remote installation's native `use` command to download, compile and restart Clash, briefly interrupting proxy connections. Failed switches attempt to restore the previous subscription and manual node selections, and report whether recovery succeeded.
+- Every subscription, including `default`, can be removed after confirmation. Removing the active source first applies and verifies the next enabled source in list order (wrapping to the start); if switching fails, the old source is retained. Removing an inactive source preserves the current connection. With no enabled replacement, Clash is stopped before removing the source; removing the last one clears the list. Adding and switching a new source can start it again. Agent Center uses the installation's native configuration writer and `yq` for storage, adapting the native script's `default` restriction without editing its source.
+- The URL input is masked. URLs persist in the native `runtime/subscriptions.yaml`; Agent Center does not include them in source code, VS Code settings or logs. It passes URLs to the native subscription writer through standard input; clash-for-linux manages subsequent downloads. Protect the server's subscription file.
+- Requires compatible clash-for-linux scripts and subscription storage on a Linux/WSL extension host. Discovery checks the runtime configuration's installation and common locations. Set `agentStatus.clash.installDirectory` for custom locations. A standalone Clash controller API does not provide this subscription management.
+
+The hover also shows the active subscription's cached name (or source hostname) and native identifier.
 
 ## Opening files from Codex
 
@@ -62,7 +129,69 @@ Agent Center reads only new entries from the current window's existing `Codex.lo
 - **Agent Center: Restart Codex File Link Listener**: restart after troubleshooting, then click the link again.
 - `agentStatus.codexImageLinks.logFile`: advanced override for the absolute path to the current window and extension host's `Codex.log`. Leave empty for automatic detection. It selects a file to read, not a destination for new logs.
 
+## Commands
+
+Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Agent Center**. Every contributed command is listed here:
+
+| Command | Purpose |
+| --- | --- |
+| Agent Center: Refresh Codex Usage | Refresh the current environment's Codex quota. |
+| Agent Center: Choose Codex Usage Display | Choose remaining or used percentage for Codex. |
+| Agent Center: Refresh Claude Usage | Refresh the current environment's Claude quota. |
+| Agent Center: Choose Claude Usage Display | Choose remaining or used percentage for Claude. |
+| Agent Center: Test Google Website Connectivity | Run the extension-host Google check immediately. |
+| Agent Center: Refresh Clash Node Speed | Read Clash state and test the selected node's Google latency. |
+| Agent Center: Choose Clash Node | Search for and switch a node in a manual selector group. |
+| Agent Center: Add Clash Subscription | Paste a URL, detect its name, then save or switch. |
+| Agent Center: Choose Clash Subscription | Select and apply a saved subscription. |
+| Agent Center: Remove Clash Subscription | Confirm deletion, switching or stopping Clash when needed. |
+| Agent Center: Restart Codex File Link Listener | Restart log detection and text-tab recovery. |
+| Agent Center: Show Diagnostics | Inspect all monitors in the Agent Center output channel. |
+| Agent Center: Open Settings | Open this extension's settings. |
+
+## Feature settings and diagnostics
+
+Search for **Agent Center** in Settings, or run **Agent Center: Open Settings**. These switches are independent and enabled by default:
+
+| Settings group | Enable/disable | Other options |
+| --- | --- | --- |
+| Codex quota | `agentStatus.codex.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
+| Claude quota | `agentStatus.claude.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
+| Extension-host Google check | `agentStatus.network.enabled` | `testTimeoutMs`, `updateIntervalSeconds` |
+| Clash nodes and subscriptions | `agentStatus.clash.enabled` | `configPath`, `controller`, `secret`, `installDirectory`, `group`, `testTimeoutMs`, `updateIntervalSeconds` |
+| Codex file-link recovery | `agentStatus.codexImageLinks.enabled` | `extensions`, `reopenTextDocuments`, `logFile` |
+
+Each option in the last column uses its row's prefix, for example `agentStatus.network.updateIntervalSeconds`. With Remote SSH, WSL or containers, use the current remote environment's settings and paths. Existing legacy Notifyer quota settings are used as fallbacks when the corresponding Agent Center setting is not explicitly configured.
+
+**Agent Center: Show Diagnostics** opens the output channel with `codex`, `claude`, `network`, `clash` and `codexImageLinks` results. Use it to identify the active extension host, last check, detected configuration and recent file-recovery results. The output omits access tokens, proxy passwords, controller secrets and complete private subscription URLs. File-opening, network and Clash operations require a trusted workspace.
+
+## Related extension
+
+[Notifyer](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion) is another extension by the same publisher.
+
 ## Changelog
+
+See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.22 - 2026-10-17
+
+- Document the full feature set, setup, refresh schedules, settings and all commands on both the GitHub and Marketplace homepages.
+
+### 0.1.21 - 2026-10-17
+
+- Set extension-host Google checks to run every five hours, keeping Clash node tests at five minutes by default.
+
+### 0.1.20 - 2026-10-17
+
+- Detect Google connectivity with a single `✅️` / `❌` before the Clash globe, treating any HTTP response as connected.
+
+### 0.1.10 - 2026-10-15
+
+- Added clash-for-linux subscription saving, switching, active-subscription hover details and recovery after failed switches.
+
+### 0.1.9 - 2026-10-15
+
+- Added Clash/Mihomo Google latency, current-node hover details and one-click switching, with automatic remote configuration discovery.
 
 ### 0.1.8 - 2026-09-30
 

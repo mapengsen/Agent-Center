@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "Codex and Claude usage details in the status bar, plus file-link recovery through the VS Code CLI.",
-  "version": "0.1.8",
+  "description": "Codex/Claude quotas, Google connectivity, Clash nodes and subscriptions, and file-link recovery in VS Code.",
+  "version": "0.1.22",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -32,7 +32,9 @@
     "usage",
     "coding agent",
     "multi-agent",
-    "status bar"
+    "status bar",
+    "clash",
+    "mihomo"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
@@ -52,6 +54,30 @@
       {
         "command": "agentStatus.restartCodexImageLinks",
         "title": "Agent Center: Restart Codex File Link Listener"
+      },
+      {
+        "command": "agentStatus.refreshClash",
+        "title": "Agent Center: Refresh Clash Node Speed"
+      },
+      {
+        "command": "agentStatus.refreshNetwork",
+        "title": "Agent Center: Test Google Website Connectivity"
+      },
+      {
+        "command": "agentStatus.chooseClashNode",
+        "title": "Agent Center: Choose Clash Node"
+      },
+      {
+        "command": "agentStatus.addClashSubscription",
+        "title": "Agent Center: Add Clash Subscription"
+      },
+      {
+        "command": "agentStatus.chooseClashSubscription",
+        "title": "Agent Center: Choose Clash Subscription"
+      },
+      {
+        "command": "agentStatus.removeClashSubscription",
+        "title": "Agent Center: Remove Clash Subscription"
       },
       {
         "command": "agentStatus.refreshCodexUsage",
@@ -108,6 +134,76 @@
             ".docx", ".xlsx", ".pptx"
           ],
           "description": "使用 code -r 补开的文件扩展名，同时控制失败日志与文本标签页两条补开流程。大小写不敏感，可带或不带前导点；列表为空则不处理任何格式。预览方式取决于 VS Code 默认编辑器及已安装的查看器扩展。"
+        },
+        "agentStatus.network.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "从当前 VS Code 扩展宿主检测 Google 公开网页，收到任意 HTTP 响应即在 Clash 测速项前显示 ✅️，无响应显示 ❌。Remote SSH 中测试远程扩展宿主；独立于 Clash 节点测速。"
+        },
+        "agentStatus.network.testTimeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "minimum": 1000,
+          "maximum": 60000,
+          "scope": "machine-overridable",
+          "description": "Google 网页联网检测的总超时时间（毫秒），包括 DNS、连接和 TLS；收到响应头即完成，不跟随跳转。"
+        },
+        "agentStatus.network.updateIntervalSeconds": {
+          "type": "number",
+          "default": 18000,
+          "minimum": 30,
+          "maximum": 86400,
+          "description": "VS Code 扩展宿主的 Google 联网自动检测间隔（秒），默认 18000 秒（5 小时）；启动时检测一次，也可从状态栏悬浮卡片立即检测。与 Clash 节点测速间隔独立。"
+        },
+        "agentStatus.clash.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "在状态栏显示当前 Clash 节点、Google 延迟并提供节点切换。Remote SSH 中会访问远程扩展宿主的 Clash 控制器。"
+        },
+        "agentStatus.clash.controller": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Clash/Mihomo external-controller 地址。留空从当前扩展宿主的 Clash 配置读取，未找到时使用 http://127.0.0.1:9090。"
+        },
+        "agentStatus.clash.configPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "当前扩展宿主的 Clash/Mihomo YAML 配置路径。留空在 Linux/WSL 优先识别运行进程的 -f/-d，再查命令入口、环境变量和常见目录，自动读取控制器地址与密钥。手动路径优先；支持 ~/。"
+        },
+        "agentStatus.clash.secret": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "覆盖配置文件中的控制器 secret；留空自动读取。建议保留为空并使用 configPath，不必把密钥写进 VS Code 设置。"
+        },
+        "agentStatus.clash.installDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Linux/WSL 远程环境中的 clash-for-linux 安装目录，用于添加与切换订阅。留空根据自动识别的运行配置和常见目录查找；填写时也用于读取 runtime/config.yaml。订阅链接保存在原生 runtime/subscriptions.yaml，不写入 VS Code 设置或日志。"
+        },
+        "agentStatus.clash.group": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "规则模式下用于显示、测速和切换的代理组。留空优先按配置顺序选择手动策略组；全局模式使用 GLOBAL，直连模式显示 DIRECT。"
+        },
+        "agentStatus.clash.testTimeoutMs": {
+          "type": "number",
+          "default": 8000,
+          "minimum": 1000,
+          "maximum": 30000,
+          "scope": "machine-overridable",
+          "description": "单节点测速超时时间（毫秒），超时显示 × 超时。"
+        },
+        "agentStatus.clash.updateIntervalSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 30,
+          "maximum": 3600,
+          "description": "状态栏自动刷新和测速间隔（秒），默认 300 秒（5 分钟）。手动刷新及切换节点或订阅后立即测速。"
         },
         "agentStatus.codex.enabled": {
           "type": "boolean",
@@ -186,12 +282,13 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/network.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },
   "dependencies": {
-    "axios": "^1.7.9"
+    "axios": "^1.7.9",
+    "js-yaml": "^4.3.1"
   },
   "devDependencies": {
     "@types/node": "20.19.43",
