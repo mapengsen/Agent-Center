@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import * as vm from "node:vm";
-import { buildProviderConfig, getApiProvider, parseCodexConfig, validateProviderId } from "../codexProviderConfig";
+import { buildProviderConfig, getApiProvider, listApiProviders, parseCodexConfig, validateProviderId } from "../codexProviderConfig";
 import { findPython, runProviderHelper, resolveCodexHome, switchCodexProvider, type PythonCommand } from "../codexProviderService";
 
 const script = path.resolve(__dirname, "../../resources/codex_provider_history.py");
@@ -73,6 +73,15 @@ test("official switching refuses a custom API environment override", () => {
 test("Codex home uses the extension host environment rather than the quota credential override", () => {
   assert.equal(resolveCodexHome({}, os.homedir()), path.join(os.homedir(), ".codex"));
   assert.equal(resolveCodexHome({ CODEX_HOME: "~/another-codex" }), path.join(os.homedir(), "another-codex"));
+});
+
+test("configured API menu exposes only valid IDs and display names, never addresses or credentials", () => {
+  const config = parseCodexConfig(api + '[model_providers."another-api"]\nname="Friendly API"\nbase_url="https://private.example/v1"\nenv_key="PRIVATE_KEY"\n');
+  const items = listApiProviders(config);
+  assert.deepEqual(items, [{ id: "beeapi", name: "My API" }, { id: "another-api", name: "Friendly API" }]);
+  assert.doesNotMatch(JSON.stringify(items), /secret-never-log|private.example|PRIVATE_KEY/);
+  assert.deepEqual(listApiProviders({ model_providers: { openai: {}, "bad id": {}, malformed: 1, valid: { name: "One\nLine" } } }), [{ id: "valid", name: "One Line" }]);
+  assert.deepEqual(listApiProviders({}), []);
 });
 
 let python: PythonCommand;
@@ -235,7 +244,8 @@ async function uiHarness(t: { after: (fn: () => void) => void }) {
   let config = official + api;
   let shown = false;
   const bar = { text: "", tooltip: undefined as unknown, show: () => { shown = true; }, hide: () => { shown = false; }, dispose: () => {} };
-  const picks: Array<{ value: string } | undefined> = [];
+  const picks: Array<{ value: string; providerId?: string } | undefined> = [];
+  const shownPicks: Array<Array<{ label: string; description?: string; value: string; providerId?: string }>> = [];
   const inputs: Array<string | undefined> = [];
   const inputOptions: Array<{ prompt: string; password?: boolean }> = [];
   const switches: Array<{ provider: string; newProvider?: { apiKey: string } }> = [];
@@ -250,7 +260,7 @@ async function uiHarness(t: { after: (fn: () => void) => void }) {
     workspace: { isTrusted: true, getConfiguration: () => ({ get: (key: string, fallback: unknown) => settings[key] ?? fallback }) },
     window: {
       createStatusBarItem: () => bar,
-      showQuickPick: async () => picks.shift(),
+      showQuickPick: async (items: typeof shownPicks[number]) => { shownPicks.push(items); return picks.shift(); },
       showInputBox: async (options: { prompt: string; password?: boolean }) => { inputOptions.push(options); return inputs.shift(); },
       showWarningMessage: async (text: string) => { notices.push(text); },
       showInformationMessage: async (text: string) => { notices.push(text); return noticeAction; },
@@ -275,8 +285,8 @@ async function uiHarness(t: { after: (fn: () => void) => void }) {
   }, { filename: entry });
   const switcher = new module.exports.CodexProviderSwitcher({ asAbsolutePath: (value: string) => "/extension/" + value } as import("vscode").ExtensionContext);
   t.after(() => switcher.dispose());
-  return { switcher, bar, picks, inputs, inputOptions, switches, commands, settings, notices, fakeVscode,
-    shown: () => shown, setNoticeAction: (value: string) => { noticeAction = value; } };
+  return { switcher, bar, picks, shownPicks, inputs, inputOptions, switches, commands, settings, notices, fakeVscode,
+    shown: () => shown, setNoticeAction: (value: string) => { noticeAction = value; }, setConfig: (value: string) => { config = value; } };
 }
 
 test("provider entry remains accessible without quota credentials, with manual refresh and reload", async (t) => {
@@ -302,6 +312,40 @@ test("custom API input explains the provider ID and reuses an existing definitio
   assert.equal(h.inputOptions.length, 1);
   assert.match(h.bar.text, /beeapi/);
   assert.equal(JSON.stringify(h.switcher.getDiagnostics()).includes("secret-never-log"), false);
+});
+
+test("configured API selection and switching back require no text input", async (t) => {
+  const h = await uiHarness(t);
+  h.picks.push({ value: "configured", providerId: "beeapi" });
+  await h.switcher.choose();
+  const option = h.shownPicks[0].find((item) => item.providerId === "beeapi");
+  assert.equal(option?.label, "beeapi");
+  assert.equal(option?.description, "My API");
+  assert.equal(h.switches[0].provider, "beeapi");
+  assert.equal(h.switches[0].newProvider, undefined);
+  assert.equal(h.inputOptions.length, 0);
+  assert.doesNotMatch(JSON.stringify(h.shownPicks), /secret-never-log|https:\/\/example.com/);
+  h.picks.push({ value: "official" });
+  await h.switcher.choose();
+  assert.match(h.shownPicks[1].find((item) => item.providerId === "beeapi")?.description ?? "", /当前服务商/);
+  assert.equal(h.switches[1].provider, "openai");
+  assert.equal(h.inputOptions.length, 0);
+});
+
+test("provider menu rereads external config changes and still offers manual input with no APIs", async (t) => {
+  const h = await uiHarness(t);
+  await h.switcher.refresh();
+  h.setConfig('model_provider="new-api"\n[model_providers.new-api]\nname="New API"\nbase_url="https://example.com/v1"\nexperimental_bearer_token="new-secret"\n');
+  h.picks.push(undefined);
+  await h.switcher.choose();
+  assert.equal(h.shownPicks[0].some((item) => item.providerId === "beeapi"), false);
+  assert.match(h.shownPicks[0].find((item) => item.providerId === "new-api")?.description ?? "", /当前服务商/);
+  h.setConfig(official);
+  h.picks.push(undefined);
+  await h.switcher.choose();
+  assert.equal(h.shownPicks[1].length, 2);
+  assert.equal(h.shownPicks[1].some((item) => item.value === "api"), true);
+  assert.equal(h.switches.length, 0);
 });
 
 test("new API setup masks the key and cancelling any input makes no changes", async (t) => {

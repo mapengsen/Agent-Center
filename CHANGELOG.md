@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.26 - 2026-10-21
+
+### Changed / 变更
+
+- List configured Codex APIs directly alongside official ChatGPT login. Display the provider ID, configured name and current selection; clicking an existing API requires no ID, address or credential input. Keep manual ID entry and first-use setup as a fallback, reread configuration each time the menu opens, and preserve shared history and backup behavior.
+- 服务商菜单直接列出已配置的 `beeapi` 等 API，与官方 ChatGPT 并列，展示 ID、配置名称和当前选择；直接点击，无需重复输入 ID、地址或密钥。保留手动输入和首次配置备用入口，每次打开菜单读取最新配置，历史共用与备份机制保持不变。
+
 ## 0.1.25 - 2026-10-21
 
 ### Added / 新增

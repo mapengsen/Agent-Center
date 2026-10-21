@@ -12,7 +12,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 
 | Feature | What you can do |
 | --- | --- |
-| Codex provider switching and shared history | Choose official ChatGPT login or enter a custom API provider ID, such as `beeapi`. Reuse an existing configuration, or enter a Base URL and masked API Key on first use. Every switch makes all indexed local history available to the selected provider, with backups and failure recovery. |
+| Codex provider switching and shared history | Choose official ChatGPT login or directly select a configured API such as `beeapi`, with no repeated typing. Manual ID entry and first-use API setup remain available. Every switch makes all indexed local history available to the selected provider, with backups and failure recovery. |
 | Codex usage quotas | See remaining or used percentages, short/long windows, reset times, account email and plan in the status bar and hover. |
 | Claude usage quotas | Inspect 5-hour, 7-day, Opus and Sonnet windows when returned by the service, plus subscription and reset details. |
 | Quota display and refresh | Choose remaining/used mode for each provider, see colored usage markers, click to refresh, and use automatic refresh with failure retries. |
@@ -48,7 +48,8 @@ The image shows the quota items. A combined connectivity and Clash example is `�
 Click the dedicated provider status item, use the Codex quota hover action, or run **Agent Center: Switch Codex Provider**. The dedicated item is available even without quota credentials.
 
 - **OpenAI 官方（ChatGPT 登录）** selects built-in `openai` and ChatGPT authentication, retaining existing login files. Complete ChatGPT login in Codex if needed. User-level custom OpenAI/ChatGPT endpoint overrides are removed; a custom `OPENAI_BASE_URL` environment override must be cleared first.
-- **自定义 API** asks for the provider **ID**, not a model or display name. For `model_provider = "beeapi"`, enter `beeapi`. Existing `[model_providers.beeapi]` settings and credentials are reused. For a new ID, enter a Responses-compatible Base URL and a masked API Key; these are saved in the current environment's `config.toml`, never in VS Code settings or diagnostics. Custom providers requiring ChatGPT authentication must be configured for API authentication first.
+- **Configured APIs**, such as **beeapi**, are listed directly from `[model_providers.*]` in the current environment's `config.toml`. Click the desired ID to reuse its address and credentials, without any text input. The menu shows each configured display name and marks the current provider; reopening it picks up external config edits. Only IDs and names appear in the list.
+- **输入其他 API ID…** is the optional manual-entry fallback. For `model_provider = "beeapi"`, enter `beeapi`, not a model or display name. An existing configuration is reused. For a new ID, enter a Responses-compatible Base URL and a masked API Key; these are saved in `config.toml`, never in VS Code settings or diagnostics. Custom providers requiring ChatGPT authentication must be configured for API authentication first.
 
 Each explicit switch updates the provider label of **all indexed local threads in the current `CODEX_HOME`** so the same history is available whichever provider you select. Conversation bodies, JSONL files, pagination offsets, titles, order, archives and login files are preserved. Archived chats remain in their archived list; workspace and thread-type filters still apply. Continuing a chat after reload uses the selected provider, subject to its model and feature support. The scope is this environment's local history. The quota item still reports the saved ChatGPT account's quota, independently of custom API balances.
 
@@ -202,6 +203,10 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.26 - 2026-10-21
+
+- Select configured Codex APIs directly from the provider menu, showing their IDs, names and current selection without repeatedly entering an ID or API credentials.
 
 ### 0.1.25 - 2026-10-21
 

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getApiProvider, isApiUrl, parseCodexConfig, validateProviderId, type NewApiProvider } from "./codexProviderConfig";
+import { getApiProvider, isApiUrl, listApiProviders, parseCodexConfig, validateProviderId, type NewApiProvider } from "./codexProviderConfig";
 import { readCodexConfig, resolveCodexHome, switchCodexProvider, type ProviderSwitchResult } from "./codexProviderService";
 
 export class CodexProviderSwitcher implements vscode.Disposable {
@@ -55,21 +55,33 @@ export class CodexProviderSwitcher implements vscode.Disposable {
       void vscode.window.showWarningMessage("请先信任当前工作区，再切换 Codex 服务商。");
       return;
     }
-    const selection = await vscode.window.showQuickPick([
-      { label: "OpenAI 官方（ChatGPT 登录）", description: this.provider === "openai" ? "当前服务商" : "使用已有 ChatGPT 登录", value: "official" },
-      { label: "自定义 API", description: "自己输入 model_provider 的 ID，例如 beeapi", value: "api" },
-    ], { title: "切换 Codex 服务商 · 全部历史共用", placeHolder: "切换后重新加载窗口生效；请先停止正在进行的 Codex 回复。" });
-    if (!selection) return;
     this.busy = true;
     try {
-      let provider = "openai";
+      const config = parseCodexConfig(await readCodexConfig(this.home));
+      const current = typeof config.model_provider === "string" ? config.model_provider : "openai";
+      const items: Array<vscode.QuickPickItem & { value: string; providerId?: string }> = [
+        { label: "OpenAI 官方（ChatGPT 登录）", description: current === "openai" ? "当前服务商" : "使用已有 ChatGPT 登录", value: "official" },
+        ...listApiProviders(config).map(({ id, name }) => ({
+          label: id,
+          description: [id === current ? "当前服务商" : "", name !== id ? name : ""].filter(Boolean).join(" · "),
+          detail: "直接使用已配置的 API，共用全部历史，无需再次输入地址或密钥。",
+          value: "configured", providerId: id,
+        })),
+        { label: "输入其他 API ID…", description: "例如 beeapi；未配置时可新增", value: "api" },
+      ];
+      const selection = await vscode.window.showQuickPick(items, {
+        title: "切换 Codex 服务商 · 全部历史共用", matchOnDescription: true,
+        placeHolder: "直接选择已配置的服务商；切换后重新加载窗口生效，请先停止 Codex 回复。",
+      });
+      if (!selection) return;
+      let provider = selection.value === "configured" ? selection.providerId! : "openai";
       let newProvider: NewApiProvider | undefined;
       if (selection.value === "api") {
         const entered = await vscode.window.showInputBox({
           title: "自定义 API 服务商 ID",
           prompt: '请输入 model_provider 的值。例如配置为 model_provider = "beeapi"，这里只填 beeapi。',
           placeHolder: "beeapi",
-          value: this.provider === "openai" ? "" : this.provider,
+          value: current === "openai" ? "" : current,
           validateInput: (value) => validateProviderId(value.trim()),
           ignoreFocusOut: true,
         });

@@ -26,6 +26,18 @@ export function getApiProvider(config: CodexConfig, id: string): CodexConfig | u
   return provider && typeof provider === "object" && !Array.isArray(provider) ? provider as CodexConfig : undefined;
 }
 
+export function listApiProviders(config: CodexConfig): Array<{ id: string; name: string }> {
+  const providers = config.model_providers;
+  if (!providers || typeof providers !== "object" || Array.isArray(providers)) return [];
+  return Object.keys(providers).flatMap((id) => {
+    const provider = getApiProvider(config, id);
+    if (validateProviderId(id) || !provider) return [];
+    // Return only menu metadata. Do not expose API keys or endpoint URLs.
+    const name = typeof provider.name === "string" ? provider.name.replace(/[\r\n\t]/g, " ").trim().slice(0, 100) : "";
+    return [{ id, name }];
+  });
+}
+
 // Find complete root statements without mistaking strings, arrays or comments
 // for table headers. Only selected root keys are changed; provider secrets,
 // comments, project settings and multiline strings stay byte-for-byte intact.
