@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS,
+  DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS,
   formatQuotaStatus,
   formatResetDateTime,
   parseClaudeAuthData,
@@ -42,31 +43,34 @@ test("uses distinct health colors for usage thresholds", () => {
 });
 
 test("uses startup cadence and retries failed regular refreshes", () => {
-  const cadence = new UsageRefreshCadence();
   assert.equal(STARTUP_USAGE_REFRESH_COUNT, 3);
   assert.equal(STARTUP_USAGE_REFRESH_INTERVAL_SECONDS, 60);
   assert.equal(REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS, 30);
   assert.equal(MAX_REGULAR_USAGE_REFRESH_ATTEMPTS, 5);
   assert.equal(DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS, 900);
-  for (let remaining = 3; remaining > 0; remaining -= 1) {
-    assert.equal(cadence.startupRefreshesRemaining, remaining);
-    assert.equal(cadence.getDelaySeconds(900), 60);
-    assert.equal(cadence.consumeScheduledRefresh(), true);
-  }
-  assert.equal(cadence.consumeScheduledRefresh(), false);
-  assert.equal(cadence.getDelaySeconds(900), 900);
+  assert.equal(DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS, 180);
+  for (const interval of [DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS, DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS]) {
+    const cadence = new UsageRefreshCadence();
+    for (let remaining = 3; remaining > 0; remaining -= 1) {
+      assert.equal(cadence.startupRefreshesRemaining, remaining);
+      assert.equal(cadence.getDelaySeconds(interval), 60);
+      assert.equal(cadence.consumeScheduledRefresh(), true);
+    }
+    assert.equal(cadence.consumeScheduledRefresh(), false);
+    assert.equal(cadence.getDelaySeconds(interval), interval);
 
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
-    cadence.recordRegularRefreshResult(false);
-    assert.equal(cadence.regularRefreshAttemptsCount, attempt);
-    assert.equal(
-      cadence.getDelaySeconds(900),
-      attempt < 5 ? REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS : 900,
-    );
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      cadence.recordRegularRefreshResult(false);
+      assert.equal(cadence.regularRefreshAttemptsCount, attempt);
+      assert.equal(
+        cadence.getDelaySeconds(interval),
+        attempt < 5 ? REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS : interval,
+      );
+    }
+    cadence.recordRegularRefreshResult(true);
+    assert.equal(cadence.regularRefreshAttemptsCount, 0);
+    assert.equal(cadence.getDelaySeconds(interval), interval);
   }
-  cadence.recordRegularRefreshResult(true);
-  assert.equal(cadence.regularRefreshAttemptsCount, 0);
-  assert.equal(cadence.getDelaySeconds(900), 900);
 });
 
 test("resolves credentials inside the extension host environment", () => {

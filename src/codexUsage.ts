@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { getProviderSetting, hasLegacyQuotaConfiguration } from "./configuration";
 import {
-  DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS,
+  DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS,
   formatQuotaStatus,
   formatResetDuration,
   UsageRefreshCadence,
@@ -137,7 +137,7 @@ export class CodexUsageMonitor implements vscode.Disposable {
     const regularIntervalSeconds = getProviderSetting(
       "codex",
       "usageUpdateIntervalSeconds",
-      DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS,
+      DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS,
     );
     const seconds = this.refreshCadence.getDelaySeconds(regularIntervalSeconds);
     this.timer = setTimeout(() => {

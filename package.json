@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex/Claude quotas, Codex provider switching with shared history, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -263,9 +263,9 @@
         },
         "agentStatus.codex.usageUpdateIntervalSeconds": {
           "type": "number",
-          "default": 900,
+          "default": 180,
           "minimum": 30,
-          "description": "Codex 正常阶段的刷新间隔（秒），默认 15 分钟。启动后会先立即刷新，并在之后每 60 秒自动刷新 3 次。常规阶段失败时每 30 秒重试，单轮最多 5 次。"
+          "description": "Codex 正常阶段的刷新间隔（秒），默认 3 分钟（180 秒）。启动后会先立即刷新，并在之后每 60 秒自动刷新 3 次。常规阶段失败时每 30 秒重试，单轮最多 5 次。"
         },
         "agentStatus.codex.usageDisplayMode": {
           "type": "string",

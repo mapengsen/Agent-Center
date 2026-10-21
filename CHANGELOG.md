@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.27 - 2026-10-21
+
+### Changed / 变更
+
+- Refresh Codex quotas every three minutes by default (180 seconds). Preserve startup checks, retries, manual refresh and configured overrides. Claude retains its fifteen-minute default.
+- Codex 额度默认刷新间隔改为 3 分钟（180 秒），保留启动刷新、失败重试、手动刷新和已有自定义设置；Claude 默认间隔仍为 15 分钟。
+
 ## 0.1.26 - 2026-10-21
 
 ### Changed / 变更
