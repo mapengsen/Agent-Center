@@ -5,6 +5,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { discoverClashConfigCandidates, type ClashDiscoveryOptions } from "../clashDiscovery";
 import { loadClashConnection, type ClashSettings } from "../clashConfig";
+import { clashInstallationConfigs, clashInstallationLayout } from "../clashLayout";
 
 const settings: ClashSettings = {
   controller: "", secret: "", configPath: "", group: "", testTimeoutMs: 8000, updateIntervalSeconds: 300,
@@ -91,7 +92,7 @@ test("CLI wrappers and shell functions reveal installations without executing sh
   assert.deepEqual(await discoverClashConfigCandidates(h.home, options), [file]);
   const profile = path.join(h.home, ".bashrc");
   await fs.writeFile(profile, script.replace("core/clashctl.sh", "cmd/clashctl.sh"));
-  assert.deepEqual(await discoverClashConfigCandidates(h.home, { ...h.options, shellFiles: [profile] }), [file]);
+  assert.deepEqual(await discoverClashConfigCandidates(h.home, { ...h.options, shellFiles: [profile] }), [path.join(root, "resources", "runtime.yaml")]);
   await assert.rejects(fs.stat(marker), { code: "ENOENT" });
 });
 
@@ -125,4 +126,41 @@ test("missing procfs and oversized launchers fall back to common locations", asy
   await fs.writeFile(shell, "x".repeat(256 * 1024 + 1));
   const options = { ...h.options, procRoot: path.join(h.home, "missing-proc"), shellFiles: [shell] };
   assert.equal((await loadClashConnection(settings, h.home, options)).configPath, expected);
+});
+
+test("recognizes flat and host-isolated runtimes without accepting arbitrary ancestor paths", () => {
+  const root = path.resolve("cluster installation");
+  const flat = path.join(root, "runtime");
+  const isolated = path.join(flat, "hosts", "ln01");
+  assert.deepEqual(clashInstallationLayout(path.join(flat, "config.yaml")), { root, runtimeDirectory: flat });
+  assert.deepEqual(clashInstallationLayout(path.join(isolated, "config.yaml")), { root, runtimeDirectory: isolated, host: "ln01" });
+  assert.equal(clashInstallationLayout(path.join(root, "other", "ln01", "config.yaml")), undefined);
+  assert.equal(clashInstallationLayout(""), undefined);
+  assert.deepEqual(clashInstallationConfigs(root, "ln01.cluster"), [
+    path.join(isolated, "config.yaml"), path.join(flat, "config.yaml"),
+  ]);
+});
+
+test("explicit installation uses the current host config before a stale shared config", async (t) => {
+  const h = await fixture(t);
+  const root = path.join(h.home, "cluster");
+  const [hostConfig, flatConfig] = clashInstallationConfigs(root);
+  await h.config(flatConfig, 9001);
+  await h.config(hostConfig, 9002);
+  const connection = await loadClashConnection({ ...settings, installDirectory: root }, h.home, h.options);
+  assert.equal(connection.configPath, hostConfig);
+  assert.equal(connection.controller, "http://127.0.0.1:9002");
+});
+
+test("a stopped custom per-host installation is rediscovered from its shell profile without a running process", async (t) => {
+  const h = await fixture(t);
+  const root = path.join(h.home, "shared installation");
+  const [hostConfig, sharedConfig] = clashInstallationConfigs(root);
+  await h.config(hostConfig, 27891); await h.config(sharedConfig, 9090);
+  const profile = path.join(h.home, ".config", "clash-for-linux", "profile.sh");
+  await fs.mkdir(path.dirname(profile), { recursive: true });
+  await fs.writeFile(profile, 'source "' + root.replace(/\\/g, "/") + '/scripts/core/alias.sh"\n');
+  const connection = await loadClashConnection(settings, h.home, { ...h.options, shellFiles: [profile] });
+  assert.equal(connection.configPath, hostConfig);
+  assert.equal(connection.controller, "http://127.0.0.1:27891");
 });

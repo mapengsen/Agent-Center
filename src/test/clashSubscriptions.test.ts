@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as http from "node:http";
-import { ClashSubscriptions, runSubscriptionCommand, validateSubscriptionName, validateSubscriptionUrl, type SubscriptionRunner } from "../clashSubscriptions";
+import { ClashSubscriptions, discoverClashSubscriptions, runSubscriptionCommand, validateSubscriptionName, validateSubscriptionUrl, type SubscriptionRunner } from "../clashSubscriptions";
 
 async function fixture(t: TestContext) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-center-subscriptions-"));
@@ -371,4 +371,90 @@ test("native removal deletes default with yq, preserves a replacement and clears
   assert.deepEqual(await manager.remove("second", api.connection), { active: "", stopped: true });
   assert.deepEqual(await manager.list(), { active: "", sources: [] });
   assert.equal(await fs.readFile(path.join(h.root, "actions"), "utf8"), "use\noff\n");
+});
+
+async function isolatedFixture(t: TestContext) {
+  const h = await fixture(t);
+  const runtime = path.join(h.root, "runtime", "hosts", "ln01");
+  const other = path.join(h.root, "runtime", "hosts", "ln02");
+  const core = path.join(h.root, "scripts", "core");
+  await Promise.all([runtime, other, core, path.join(h.root, "runtime", "bin")].map((dir) => fs.mkdir(dir, { recursive: true })));
+  await Promise.all(["common.sh", "config.sh", "clashctl.sh"].map((name) => fs.writeFile(path.join(core, name), "")));
+  await fs.writeFile(path.join(h.root, "runtime", "bin", "yq"), "");
+  const file = path.join(runtime, "subscriptions.yaml");
+  const configPath = path.join(runtime, "config.yaml");
+  await fs.writeFile(configPath, "external-controller: 127.0.0.1:9090\n");
+  await fs.writeFile(file, JSON.stringify({ active: "node-only", sources: { "node-only": { enabled: true } } }));
+  await fs.writeFile(path.join(other, "subscriptions.yaml"), JSON.stringify({ active: "other-only", sources: { "other-only": {} } }));
+  return { ...h, runtime, other, core, file, configPath };
+}
+
+test("subscription discovery binds a custom installation to the live host runtime, including explicit roots", async (t) => {
+  const h = await isolatedFixture(t);
+  for (const root of ["", h.root]) {
+    const manager = await discoverClashSubscriptions(h.configPath, root, h.root, { platform: "linux", hostname: "ln01.cluster" });
+    assert.equal(manager.root, h.root);
+    assert.equal(manager.runtimeDirectory, h.runtime);
+    assert.equal((await manager.list()).active, "node-only");
+  }
+  const flat = await discoverClashSubscriptions(path.join(h.root, "runtime", "config.yaml"), "", h.root, { platform: "linux", hostname: "ln01" });
+  assert.equal(flat.runtimeDirectory, path.join(h.root, "runtime"));
+  assert.equal((await flat.list()).active, "default");
+  const byRoot = await discoverClashSubscriptions("", h.root, h.root, { platform: "linux", hostname: "ln01" });
+  assert.equal(byRoot.runtimeDirectory, h.runtime);
+  await assert.rejects(discoverClashSubscriptions(path.join(h.other, "config.yaml"), "", h.root, { platform: "linux", hostname: "ln01" }), /其他主机/);
+});
+
+test("host-specific writes, locking and rollback never overwrite shared or other-host subscriptions", async (t) => {
+  const h = await isolatedFixture(t);
+  const api = await controller(t);
+  const sharedFile = path.join(h.root, "runtime", "subscriptions.yaml");
+  const otherFile = path.join(h.other, "subscriptions.yaml");
+  const originalShared = await fs.readFile(sharedFile, "utf8");
+  const originalOther = await fs.readFile(otherFile, "utf8");
+  const manager = new ClashSubscriptions(h.root, async (_root, action, name, url, runtime) => {
+    assert.equal(runtime, h.runtime);
+    assert.ok((await fs.stat(path.join(runtime, ".agent-center-subscriptions.lock"))).isFile());
+    const data = JSON.parse(await fs.readFile(h.file, "utf8"));
+    if (action === "add") data.sources[name] = { enabled: true, url };
+    if (action === "remove") delete data.sources[name];
+    if (action === "use") {
+      data.active = name;
+      await fs.writeFile(h.file, JSON.stringify(data));
+      if (name === "added") throw new Error("simulate failed reload");
+    }
+    await fs.writeFile(h.file, JSON.stringify(data));
+  }, h.runtime);
+  await manager.add("added", "https://private.example/secret");
+  await assert.rejects(manager.use("added", api.connection), /已恢复原订阅/);
+  assert.equal((await manager.list()).active, "node-only");
+  assert.deepEqual(await manager.remove("added", api.connection), { active: "node-only", stopped: false });
+  assert.equal(await fs.readFile(sharedFile, "utf8"), originalShared);
+  assert.equal(await fs.readFile(otherFile, "utf8"), originalOther);
+  await assert.rejects(fs.stat(path.join(h.runtime, ".agent-center-subscriptions.lock")), { code: "ENOENT" });
+});
+
+test("native commands reject mismatched runtime directories before changing subscriptions or controlling services", { skip: process.platform === "win32" }, async (t) => {
+  const h = await isolatedFixture(t);
+  await fs.writeFile(path.join(h.core, "common.sh"), [
+    'init_project_context() { RUNTIME_DIR="$1/runtime"; }',
+    "load_env_if_exists() { :; }", "detect_install_scope() { :; }",
+  ].join("\n"));
+  await fs.writeFile(path.join(h.core, "config.sh"), 'set_subscription() { touch "$PROJECT_DIR/must-not-change"; }');
+  await fs.writeFile(path.join(h.core, "clashctl.sh"), 'touch "$(dirname "$0")/../../must-not-change"');
+  for (const action of ["add", "remove", "use", "start", "stop", "update"] as const) {
+    await assert.rejects(runSubscriptionCommand(h.root, action, "new", "https://private.example/secret", h.runtime), /命令执行失败/);
+  }
+  await assert.rejects(fs.stat(path.join(h.root, "must-not-change")), { code: "ENOENT" });
+});
+
+test("native start, stop and subscription update dispatch to on, off and sub update exactly", { skip: process.platform === "win32" }, async (t) => {
+  const h = await isolatedFixture(t);
+  await fs.writeFile(path.join(h.core, "common.sh"), [
+    'init_project_context() { RUNTIME_DIR="$1/runtime/hosts/ln01"; }',
+    "load_env_if_exists() { :; }", "detect_install_scope() { :; }",
+  ].join("\n"));
+  await fs.writeFile(path.join(h.core, "clashctl.sh"), 'printf "%s\\n" "$*" >> "$(dirname "$0")/../../actions"\n');
+  for (const action of ["start", "stop", "update"] as const) await runSubscriptionCommand(h.root, action, "", undefined, h.runtime);
+  assert.equal(await fs.readFile(path.join(h.root, "actions"), "utf8"), "on\noff\nsub update\n");
 });

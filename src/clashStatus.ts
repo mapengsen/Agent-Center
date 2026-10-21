@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import { ClashApiClient, findActiveGroup, resolveProxyChain } from "./clashApi";
 import { CLASH_TEST_URL, loadClashConnection, type ClashSettings } from "./clashConfig";
-import { clashTooltip, commandLink, escapeMarkdown, formatClashDelay, type ClashSnapshot } from "./clashPresentation";
+import { clashTooltip, clashControlLinks, commandLink, escapeMarkdown, formatClashDelay, type ClashSnapshot } from "./clashPresentation";
 import { discoverClashSubscriptions, validateSubscriptionUrl } from "./clashSubscriptions";
+import { discoverClashControl, type ClashControlAction } from "./clashControl";
+import { controllerListening } from "./clashRuntime";
 import type { NetworkStatusPresentation } from "./networkStatus";
 
 interface NodeSelection { group: string; node: string }
@@ -19,6 +21,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
   private lastError = "";
   private connectionFound = false;
   private noActiveSubscription = false;
+  private proxyStopped = false;
   private configPath = "";
   private controller = "";
   private networkStatus: NetworkStatusPresentation | undefined;
@@ -69,7 +72,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
           this.connectionFound = true;
           this.controller = connection.controller;
           this.configPath = connection.configPath;
-          this.showClashStatus("$(globe) Clash 已停止", "**Clash 已停止**\n\n暂无活动订阅，添加或切换订阅后可重新启动。\n\n" +
+          this.showClashStatus("$(globe) Clash 已停止", "**Clash 已停止**\n\n暂无活动订阅，添加或切换订阅后可重新启动。\n\n" + clashControlLinks() + "\n\n" +
             commandLink("添加订阅", "agentStatus.addClashSubscription") + " · " +
             commandLink("切换订阅", "agentStatus.chooseClashSubscription") + " · " +
             commandLink("删除订阅", "agentStatus.removeClashSubscription"));
@@ -91,14 +94,68 @@ export class ClashStatusMonitor implements vscode.Disposable {
       this.controller = connection.controller;
       this.configPath = connection.configPath;
       this.lastError = "";
+      this.proxyStopped = false;
       this.snapshot = { state, group, chain, delay, subscription, updatedAt: new Date() };
       this.renderSnapshot();
     } catch (error) {
       if (!this.active(generation)) return;
       this.lastError = message(error);
+      if (discovered) {
+        try {
+          const connection = await loadClashConnection(settings);
+          if (!this.active(generation)) return;
+          if (!await controllerListening(connection.controller)) {
+            if (!this.active(generation)) return;
+            this.proxyStopped = true;
+            this.snapshot = undefined;
+            this.connectionFound = true;
+            this.configPath = connection.configPath;
+            this.controller = connection.controller;
+            this.renderStopped();
+            return;
+          }
+        } catch { /* Unreachable and stopped are different states. */ }
+      }
       // Windows without Clash retry quietly, in case the service is started later.
       if (!discovered && !this.connectionFound && !settings.configPath && trigger === "automatic") this.hideClashStatus();
       else this.renderError();
+    }
+  }
+
+  public async manageControl(action: ClashControlAction): Promise<void> {
+    if (this.disposed || !enabled() || !vscode.workspace.isTrusted || this.choosing) return;
+    this.choosing = true;
+    const generation = this.generation;
+    let attempted = false;
+    try {
+      await this.pending;
+      if (!this.active(generation)) return;
+      const settings = readSettings();
+      const connection = await loadClashConnection({ ...settings, configPath: settings.configPath || this.configPath });
+      const control = await discoverClashControl(connection.configPath, settings.installDirectory);
+      if (!this.active(generation)) return;
+      const title = action === "start" ? "开启代理" : action === "stop" ? "关闭代理" : "更新当前订阅";
+      attempted = true;
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Clash：正在" + title + "…" },
+        () => control.execute(action, connection),
+      );
+      if (!this.active(generation)) return;
+      this.proxyStopped = !result.running;
+      this.lastError = "";
+      this.snapshot = undefined;
+      this.connectionFound = true;
+      this.configPath = control.configPath;
+      this.controller = connection.controller;
+      if (!result.running) this.renderStopped();
+      void vscode.window.showInformationMessage(action === "update"
+        ? "Clash 当前订阅已更新" + (result.running ? "并加载生效。" : "，代理保持关闭。")
+        : action === "start" ? "Clash 代理已开启。" : "Clash 代理已关闭。");
+    } catch (error) {
+      if (this.active(generation)) void vscode.window.showErrorMessage("Clash 操作失败：" + message(error));
+    } finally {
+      this.choosing = false;
+      if (attempted && this.active(generation)) await this.refresh();
     }
   }
 
@@ -288,6 +345,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
       group: this.snapshot?.group, mode: this.snapshot?.state.mode,
       chain: this.snapshot?.chain, delay: this.snapshot?.delay,
       subscription: this.snapshot?.subscription,
+      proxyStopped: this.proxyStopped,
       updatedAt: this.snapshot?.updatedAt.toISOString(), lastError: this.lastError,
     };
   }
@@ -320,7 +378,15 @@ export class ClashStatusMonitor implements vscode.Disposable {
     this.showClashStatus("$(globe) Clash 未连接", "**Clash 暂不可用**\n\n" + escapeMarkdown(this.lastError) + "\n\n" +
       commandLink("重试测速", "agentStatus.refreshClash") + " · " + commandLink("设置", "agentStatus.openSettings") + "\n\n" +
       commandLink("切换订阅", "agentStatus.chooseClashSubscription") + " · " + commandLink("添加订阅", "agentStatus.addClashSubscription") + " · " +
-      commandLink("删除订阅", "agentStatus.removeClashSubscription"), true);
+      commandLink("删除订阅", "agentStatus.removeClashSubscription") + "\n\n" + clashControlLinks(), true);
+  }
+
+  private renderStopped(): void {
+    this.showClashStatus("$(globe) Clash 已关闭", "**Clash 代理已关闭**\n\n" +
+      "订阅配置已保留，可点击开启代理。\n\n" + clashControlLinks() + "\n\n" +
+      commandLink("添加订阅", "agentStatus.addClashSubscription") + " · " +
+      commandLink("切换订阅", "agentStatus.chooseClashSubscription") + " · " +
+      commandLink("删除订阅", "agentStatus.removeClashSubscription"));
   }
 
   private showClashStatus(text: string, tooltip: string, warning = false): void {
@@ -351,7 +417,8 @@ export class ClashStatusMonitor implements vscode.Disposable {
 function trustedMarkdown(value: string): vscode.MarkdownString {
   const result = new vscode.MarkdownString(value);
   result.isTrusted = { enabledCommands: ["agentStatus.chooseClashNode", "agentStatus.refreshClash", "agentStatus.refreshNetwork", "agentStatus.openSettings",
-    "agentStatus.chooseClashSubscription", "agentStatus.addClashSubscription", "agentStatus.removeClashSubscription"] };
+    "agentStatus.chooseClashSubscription", "agentStatus.addClashSubscription", "agentStatus.removeClashSubscription",
+    "agentStatus.startClash", "agentStatus.stopClash", "agentStatus.updateClashSubscription"] };
   return result;
 }
 

@@ -51,19 +51,20 @@ test("reads YAML controller/secret with quotes, honors overrides and masks parse
   const directory = path.join(home, "clash-for-linux", "runtime");
   await fs.mkdir(directory, { recursive: true });
   const configPath = path.join(directory, "config.yaml");
+  const discovery = { procRoot: path.join(home, "no-proc"), env: {}, commandDirectories: [], shellFiles: [] };
   await fs.writeFile(configPath, 'external-controller: "0.0.0.0:9090"\nsecret: \'a#b: c\' # comment\nproxy-groups:\n  - name: "🔰 节点选择"\n    type: select\n');
-  const connection = await loadClashConnection(settings, home);
+  const connection = await loadClashConnection(settings, home, discovery);
   assert.equal(connection.controller, "http://127.0.0.1:9090");
   assert.equal(connection.secret, "a#b: c");
   assert.deepEqual(connection.preferredGroups, ["🔰 节点选择"]);
-  const override = await loadClashConnection({ ...settings, controller: "https://localhost:9443", secret: "override" }, home);
+  const override = await loadClashConnection({ ...settings, controller: "https://localhost:9443", secret: "override" }, home, discovery);
   assert.equal(override.controller, "https://localhost:9443");
   assert.equal(override.secret, "override");
   assert.equal(normalizeController("[::]:9090"), "http://[::1]:9090");
   assert.throws(() => normalizeController("file:///etc/passwd"));
   assert.throws(() => normalizeController("http://name:password@localhost:9090"));
   await fs.writeFile(configPath, 'secret: "do-not-leak\n');
-  await assert.rejects(loadClashConnection(settings, home), (error: Error) => {
+  await assert.rejects(loadClashConnection(settings, home, discovery), (error: Error) => {
     assert.doesNotMatch(error.message, /do-not-leak/);
     return true;
   });
@@ -139,6 +140,7 @@ async function monitorHarness(t: TestContext) {
   const state = fixture();
   const writes: Array<{ group: string; node: string }> = [];
   let timeout = false;
+  let running = true;
   let shown = false;
   const bar = {
     text: "", command: "", tooltip: undefined as unknown, color: undefined,
@@ -153,6 +155,16 @@ async function monitorHarness(t: TestContext) {
   const warnings: string[] = [];
   const commands: string[] = [];
   const subscriptionCalls: Array<{ action: string; name: string }> = [];
+  const controlCalls: string[] = [];
+  const control = {
+    configPath: "/test/config.yaml",
+    execute: async (action: string) => {
+      controlCalls.push(action);
+      if (action === "start") running = true;
+      if (action === "stop") running = false;
+      return { running };
+    },
+  };
   const subscriptions = {
     list: async () => ({ active: "default", sources: [
       { name: "default", displayName: "我的机场", hostname: "provider.example", enabled: true, type: "clash" },
@@ -164,7 +176,7 @@ async function monitorHarness(t: TestContext) {
     remove: async (name: string) => { subscriptionCalls.push({ action: "remove", name }); return { active: "default", stopped: false }; },
   };
   const api = {
-    getState: async () => structuredClone(state),
+    getState: async () => { if (!running) throw new Error("ECONNREFUSED"); return structuredClone(state); },
     getProxies: async () => structuredClone(state.proxies),
     testDelay: async () => timeout ? { ok: false, error: "test timeout" } : { ok: true, ms: 3349 },
     select: async (group: string, node: string) => { writes.push({ group, node }); state.proxies[group].now = node; },
@@ -200,13 +212,14 @@ async function monitorHarness(t: TestContext) {
         loadClashConnection: async () => ({ controller: "http://127.0.0.1:9090", configPath: "/test/config.yaml", preferredGroups: [] }),
       } : name === "./clashSubscriptions" ? {
         ...realRequire("./clashSubscriptions"), discoverClashSubscriptions: async () => subscriptions,
-      } : realRequire(name),
+      } : name === "./clashControl" ? { discoverClashControl: async () => control }
+        : name === "./clashRuntime" ? { ...realRequire(name), controllerListening: async () => running } : realRequire(name),
     setTimeout, clearTimeout,
   }, { filename: entry });
   const monitor = new module.exports.ClashStatusMonitor();
   t.after(() => monitor.dispose());
   return { monitor, state, writes, bar, fakeVscode, config, api, inputs, picks, shownInputs, shownPicks, subscriptions, subscriptionCalls,
-    notices, warnings, commands, shown: () => shown, failDelay: () => { timeout = true; } };
+    notices, warnings, commands, control, controlCalls, shown: () => shown, failDelay: () => { timeout = true; } };
 }
 
 test("status-bar click opens the existing native hover with trusted actions and no editor page", async (t) => {
@@ -219,7 +232,7 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.match(hover.value, /3349 ms/);
   assert.match(hover.value, /我的机场（default）/);
   assert.doesNotMatch(hover.value, /showClashDetails/);
-  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription"]) {
+  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription"]) {
     assert.ok(hover.value.includes("command:agentStatus." + command));
     assert.ok(hover.isTrusted.enabledCommands.includes("agentStatus." + command));
   }
@@ -228,6 +241,31 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.equal(h.shownPicks.length, 0);
   assert.deepEqual(h.notices, []);
   assert.deepEqual(h.commands, []);
+});
+
+test("runtime controls use the existing hover, keep start available while stopped, and update without adding or choosing a subscription", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  await h.monitor.manageControl("stop");
+  assert.equal(h.bar.text, "$(globe) Clash 已关闭");
+  assert.match((h.bar.tooltip as { value: string }).value, /开启代理/);
+  assert.equal(h.monitor.getDiagnostics().proxyStopped, true);
+  await h.monitor.manageControl("update");
+  assert.equal(h.bar.text, "$(globe) Clash 已关闭");
+  assert.ok(h.notices.some((notice) => notice.includes("代理保持关闭")));
+  await h.monitor.manageControl("start");
+  assert.equal(h.bar.text, "$(globe) √ Google（3349 ms）");
+  assert.deepEqual(h.controlCalls, ["stop", "update", "start"]);
+  assert.deepEqual(h.subscriptionCalls, []);
+  assert.equal(h.shownInputs.length, 0);
+  assert.equal(h.shownPicks.length, 0);
+  h.fakeVscode.workspace.isTrusted = false;
+  await h.monitor.manageControl("stop");
+  assert.equal(h.controlCalls.length, 3);
+  h.fakeVscode.workspace.isTrusted = true;
+  h.config.enabled = false;
+  await h.monitor.manageControl("start");
+  assert.equal(h.controlCalls.length, 3);
 });
 
 test("status monitor renders latency and node hover, verifies switch, rejects stale links and honors trust", async (t) => {

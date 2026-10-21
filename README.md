@@ -18,6 +18,8 @@ Agent Center puts Codex and Claude usage quotas, VS Code internet connectivity, 
 | VS Code internet connectivity | Request only Google's public website from the extension host. Any HTTP response shows `✅️`; no response shows `❌`. The single icon sits before the Clash globe. Checks run at startup and every **5 hours**, with manual checks available. |
 | Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
+| Start and stop the proxy | Use native Clash controls in the same hover, verify the controller starts or stops, retain subscriptions and keep the start action available while stopped. |
+| Update the current subscription | Download the saved active source again, force-load and verify the running configuration, preserve available manual choices and restore the previous state on failure. Updates while stopped keep the service stopped. |
 | Add, switch and delete subscriptions | Paste a URL to detect its name, save without switching or apply immediately, view the active subscription, and delete any subscription. Deleting the active source switches to the next enabled one; without a replacement, Clash stops. Requires compatible clash-for-linux. |
 | Recover Codex file links | Open supported absolute file links with `code -r`, including images, PDF, SVG, Markdown, CSV, TOML and Office files: **30 default formats**, with a configurable list. Recover failed opens and clean text tabs; preserve unsaved edits and prevent reopen loops. |
 | Remote use, settings and diagnostics | Run in the current local or remote extension host, configure feature switches, credentials and proxies, and inspect quota, connectivity, Clash and file-link diagnostics. |
@@ -72,7 +74,7 @@ Install Agent Center in your Remote SSH environment and reload the window. On Li
 - Tests use the same Google endpoint as clashtest, https://www.gstatic.com/generate_204, with an 8-second default timeout. This measures latency in milliseconds, rather than download bandwidth.
 - Refreshes and tests latency automatically every 5 minutes (300 seconds) by default. Manual refreshes and node or subscription switches test immediately. Without a discovered Clash service, only the independent connectivity icon is shown when enabled; controller failures provide retry actions.
 
-Usually leave configPath, installDirectory, controller and secret empty. For multiple instances, restricted process access or a controller in another environment, set **agentStatus.clash.configPath** in Remote Settings. Explicit configuration takes priority; specifying only installDirectory also checks its runtime/config.yaml. Leave group empty to choose a manual group in configuration order; global mode uses GLOBAL and direct mode uses DIRECT. Set group explicitly when you want a particular rule-mode group. testTimeoutMs, updateIntervalSeconds and enabled control timeout, refresh interval and visibility.
+Usually leave configPath, installDirectory, controller and secret empty. For multiple instances, restricted process access or a controller in another environment, set **agentStatus.clash.configPath** in Remote Settings. Explicit configuration takes priority; specifying only installDirectory checks its `runtime/hosts/<current-hostname>/config.yaml` before `runtime/config.yaml`. Leave group empty to choose a manual group in configuration order; global mode uses GLOBAL and direct mode uses DIRECT. Set group explicitly when you want a particular rule-mode group. testTimeoutMs, updateIntervalSeconds and enabled control timeout, refresh interval and visibility.
 
 Discovery only reads the extension host's process arguments and command registrations: it does not execute shell startup scripts, scan the entire disk, change services or persist deployment paths. Refreshes rediscover moved or restarted cores, and subscription management infers its installation from the discovered runtime config. When several cores are running, the first readable config in PID order wins; explicit settings select a particular instance.
 
@@ -80,7 +82,15 @@ All requests run in the extension host, so 127.0.0.1 in Remote SSH refers to the
 
 Commands: **Agent Center: Refresh Clash Node Speed**, **Agent Center: Choose Clash Node**, and **Agent Center: Show Diagnostics** (the clash field).
 
-### Add, switch and delete subscriptions (clash-for-linux)
+### Start, stop and update the current subscription
+
+The existing status-bar hover includes **开启代理**, **关闭代理** and **更新当前订阅**, also available as the commands below. These call [wnlen/clash-for-linux](https://github.com/wnlen/clash-for-linux)'s native `clash on`, `clash off` and `clash sub update`. Updating reuses the saved source URL; “Refresh Clash Node Speed” still only tests latency.
+
+Running updates force-load the generated configuration and verify its live nodes and groups. Manual choices that still exist are preserved. Failures attempt to restore the original configuration, subscriptions, choices and service state; updates started while stopped keep the service stopped. Native per-host runtimes and legacy `scripts/cmd/clashctl.sh` installations are supported for these three actions.
+
+Controls operate in the current Linux/WSL extension host. Native scripts manage the service and persistent proxy state; child processes cannot rewrite environment variables of already-running terminals or VS Code. Reopen a terminal or reconnect the remote window when needed. The Google connectivity badge keeps its independent check schedule.
+
+### Add, switch and delete subscription sources
 
 Click “添加订阅” / “切换订阅” / “删除订阅” in the status-bar hover, or run **Agent Center: Add Clash Subscription** / **Agent Center: Choose Clash Subscription** / **Agent Center: Remove Clash Subscription**.
 
@@ -88,8 +98,8 @@ Click “添加订阅” / “切换订阅” / “删除订阅” in the status
 - Paste an HTTP/HTTPS Clash YAML subscription URL; the name is detected automatically, falling back to its hostname. Names are made safe for native storage and duplicates receive a suffix such as `-2`. Choose to save for later or switch immediately. Saving alone does not download or replace the active configuration.
 - Switching uses the remote installation's native `use` command to download, compile and restart Clash, briefly interrupting proxy connections. Failed switches attempt to restore the previous subscription and manual node selections, and report whether recovery succeeded.
 - Every subscription, including `default`, can be removed after confirmation. Removing the active source first applies and verifies the next enabled source in list order (wrapping to the start); if switching fails, the old source is retained. Removing an inactive source preserves the current connection. With no enabled replacement, Clash is stopped before removing the source; removing the last one clears the list. Adding and switching a new source can start it again. Agent Center uses the installation's native configuration writer and `yq` for storage, adapting the native script's `default` restriction without editing its source.
-- The URL input is masked. URLs persist in the native `runtime/subscriptions.yaml`; Agent Center does not include them in source code, VS Code settings or logs. It passes URLs to the native subscription writer through standard input; clash-for-linux manages subsequent downloads. Protect the server's subscription file.
-- Requires compatible clash-for-linux scripts and subscription storage on a Linux/WSL extension host. Discovery checks the runtime configuration's installation and common locations. Set `agentStatus.clash.installDirectory` for custom locations. A standalone Clash controller API does not provide this subscription management.
+- The URL input is masked. URLs persist in the native runtime's `subscriptions.yaml`; Agent Center does not include them in source code, VS Code settings or logs. It passes URLs to the native subscription writer through standard input; clash-for-linux manages subsequent downloads. Protect the server's subscription file.
+- Requires compatible clash-for-linux scripts and subscription storage on a Linux/WSL extension host. Discovery derives the installation from both `runtime/config.yaml` and per-host `runtime/hosts/<hostname>/config.yaml`, keeping subscription reads, locks and recovery in that runtime. Native commands must use the same directory; another host's runtime is rejected. Set `agentStatus.clash.installDirectory` if automatic discovery is unavailable. A standalone Clash controller API does not provide this subscription management.
 
 The hover also shows the active subscription's cached name (or source hostname) and native identifier.
 
@@ -141,6 +151,9 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 | Agent Center: Choose Claude Usage Display | Choose remaining or used percentage for Claude. |
 | Agent Center: Test Google Website Connectivity | Run the extension-host Google check immediately. |
 | Agent Center: Refresh Clash Node Speed | Read Clash state and test the selected node's Google latency. |
+| Agent Center: Start Clash Proxy | Start the current environment's native proxy and verify its loaded configuration. |
+| Agent Center: Stop Clash Proxy | Stop the proxy, verify the controller stops and retain subscriptions. |
+| Agent Center: Update Current Clash Subscription | Refresh the saved active source, preserve its on/off state and recover on failure. |
 | Agent Center: Choose Clash Node | Search for and switch a node in a manual selector group. |
 | Agent Center: Add Clash Subscription | Paste a URL, detect its name, then save or switch. |
 | Agent Center: Choose Clash Subscription | Select and apply a saved subscription. |

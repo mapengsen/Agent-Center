@@ -18,6 +18,8 @@ Agent Center 将 Codex / Claude 使用额度、VS Code 联网状态、Clash/Miho
 | VS Code 联网检测 | 从扩展宿主只访问 Google 公开网页；收到任意 HTTP 响应显示 `✅️`，无响应显示 `❌`。图标放在 Clash 地球图标前，启动时检测一次，之后默认每 **5 小时**一次，也可手动检测。 |
 | Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
+| 开启与关闭代理 | 在同一悬浮卡片调用原生 Clash 开关，核验控制器启动或停止；关闭后仍保留开启入口，订阅不会被删除。 |
+| 更新当前订阅 | 重新下载当前订阅并校验、强制加载到运行中的 Clash，保留仍可用的手动节点选择；失败恢复原配置。关闭时更新后仍保持关闭。 |
 | 添加、切换、删除订阅 | 直接粘贴链接自动识别名称，可仅保存或立即切换，显示当前订阅，并可删除任意订阅。删除活动订阅时自动切换到下一个已启用订阅；无可用替代时停止 Clash。需要兼容的 clash-for-linux。 |
 | Codex 文件链接补开 | 通过 `code -r` 补开支持的绝对路径链接，默认 **30 种格式**，包含图片、PDF、SVG、Markdown、CSV、TOML 和 Office，可自定义列表；覆盖打开失败与未修改文本标签页，保留未保存修改并防止重复重开。 |
 | 远程环境、设置与诊断 | 在当前本地或远程扩展宿主运行，支持功能开关、凭据与代理配置，并查看额度、联网、Clash 和文件补开的诊断结果。 |
@@ -72,7 +74,7 @@ Codex 默认读取 `CODEX_HOME/auth.json` 或 `~/.codex/auth.json`，Claude 默�
 - 使用与 clashtest 一致的 Google 测试地址 https://www.gstatic.com/generate_204，默认超时 8 秒。显示的是连接延迟（ms），不是下载带宽。
 - 默认每 5 分钟（300 秒）自动刷新并测速；手动刷新及切换节点或订阅后立即测速。未发现 Clash 时仅显示已启用的独立联网图标；控制器故障显示“Clash 未连接”，可在悬停中重试。
 
-通常将 configPath、installDirectory、controller 和 secret 留空即可。存在多个 Clash 实例、进程信息不可读或控制器位于另一环境时，可在**远程设置**用 agentStatus.clash.configPath 明确选择配置；已有手动设置优先于自动发现。仅填写 installDirectory 时也会尝试读取其 runtime/config.yaml。group 留空时根据配置顺序选择手动策略组，全局模式读取 GLOBAL，直连模式读取 DIRECT。多个策略组时可指定 group。testTimeoutMs 和 updateIntervalSeconds 控制测速时限和刷新频率，enabled 可关闭此功能。
+通常将 configPath、installDirectory、controller 和 secret 留空即可。存在多个 Clash 实例、进程信息不可读或控制器位于另一环境时，可在**远程设置**用 agentStatus.clash.configPath 明确选择配置；已有手动设置优先于自动发现。仅填写 installDirectory 时，优先尝试其 `runtime/hosts/<当前主机名>/config.yaml`，再读取 `runtime/config.yaml`。group 留空时根据配置顺序选择手动策略组，全局模式读取 GLOBAL，直连模式读取 DIRECT。多个策略组时可指定 group。testTimeoutMs 和 updateIntervalSeconds 控制测速时限和刷新频率，enabled 可关闭此功能。
 
 发现过程只读取当前扩展宿主的进程参数和命令入口，不执行 shell 启动脚本，不搜索整个磁盘，也不修改 Clash 服务或写回安装路径。服务重启或位置变化后，下次刷新重新识别；订阅目录从发现的运行配置推导。多个实例默认按进程 ID 顺序选择首个可读取的配置，可用手动设置指定目标。
 
@@ -88,10 +90,20 @@ Codex 默认读取 `CODEX_HOME/auth.json` 或 `~/.codex/auth.json`，Claude 默�
 - 添加时只需粘贴 HTTP/HTTPS Clash YAML 链接，自动识别订阅名称；读取不到时使用来源域名。名称自动处理不兼容字符，重名时追加 `-2` 等后缀，再选择“保存订阅，保留当前连接”或“保存并立即切换”。仅保存时不会下载或替换当前配置。
 - 切换会调用远程 clash-for-linux 的原生 `use` 命令，下载、生成配置并按其服务管理方式重启 Clash；期间代理连接可能短暂中断。失败时尝试恢复原订阅和手动节点选择，并明确报告恢复结果。
 - 所有订阅（包括 `default`）均可确认删除。删除当前订阅时，先按列表顺序切换到下一个已启用的订阅，末尾回到开头；切换失败时保留原订阅。删除非当前订阅时保留当前连接。没有已启用的备用订阅时，先停止 Clash，再删除；删除最后一个订阅后列表清空，重新添加并切换订阅可再次启动。插件通过安装中的配置写入器和 `yq` 管理存储，适配原生脚本的 `default` 限制，无需修改 clash-for-linux 源码。
-- 链接输入框隐藏内容；订阅保存在原生 `runtime/subscriptions.yaml` 中，不写入插件源码、VS Code 设置或插件日志。插件通过标准输入将链接交给原生订阅写入器；后续下载由 clash-for-linux 管理。订阅持久保存；请保护服务器中的订阅文件。
-- 需要在 Linux/WSL 的扩展宿主安装兼容的 clash-for-linux（包含 `scripts/core/clashctl.sh`、`config.sh` 和 `runtime/subscriptions.yaml`）。自动从运行配置位置、`~/clash-for-linux` 等查找；可用 `agentStatus.clash.installDirectory` 指定目录。只有 Clash 控制器 API 的安装不支持此订阅管理功能。
+- 链接输入框隐藏内容；订阅保存在原生运行目录的 `subscriptions.yaml` 中，不写入插件源码、VS Code 设置或插件日志。插件通过标准输入将链接交给原生订阅写入器；后续下载由 clash-for-linux 管理。订阅持久保存；请保护服务器中的订阅文件。
+- 需要在 Linux/WSL 的扩展宿主安装兼容的 clash-for-linux（包含 `scripts/core/clashctl.sh`、`common.sh`、`config.sh`、`runtime/bin/yq` 和订阅文件）。自动从 `runtime/config.yaml` 或集群的 `runtime/hosts/<主机名>/config.yaml` 推断安装目录，订阅读取、锁和失败恢复均使用对应运行目录；执行原生命令前核对目录，拒绝操作其他主机的运行目录。自动发现不可用时，可用 `agentStatus.clash.installDirectory` 指定安装根目录。只有 Clash 控制器 API 的安装不支持此订阅管理功能。
 
 悬停会显示当前订阅的已缓存名称（或来源域名）和原标识，选择节点与切换订阅使用独立入口。
+
+### 开启代理、关闭代理与更新当前订阅
+
+在同一右下角悬浮卡片点击“开启代理”“关闭代理”“更新当前订阅”，或运行下方对应命令。
+
+- 开启和关闭调用 [wnlen/clash-for-linux](https://github.com/wnlen/clash-for-linux) 的原生 `clash on` / `clash off`，并核验控制器状态；关闭后显示“Clash 已关闭”，仍可点击开启。
+- 更新调用 `clash sub update`，使用已保存的当前链接，不添加新订阅、不切换到其他来源。“刷新测速”仍只测速，不下载订阅。
+- 运行中更新会强制加载生成的配置，再核对实际节点与策略组，保留更新后仍存在的手动节点选择。失败会尝试恢复原配置、订阅和运行状态，并明确提示恢复结果。代理关闭时更新后仍保持关闭。
+- 支持普通目录和按主机隔离的运行目录。旧版 `scripts/cmd/clashctl.sh` 安装也支持这三个操作，使用其原生 `clashon` / `clashoff` / `clashsub update`；旧版关闭后仍能从 Shell 注册入口重新识别配置。
+- 开关在当前扩展宿主所在的 Linux/WSL 环境执行。原生脚本管理服务和持久代理状态；已有终端及已启动的 VS Code 进程环境变量不会被子进程直接改写，必要时重新打开终端或重新连接远程窗口。前方 Google 联网图标继续按其独立检测周期更新。
 
 ## 打开 Codex 对话中的文件
 
@@ -141,6 +153,9 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 | Agent Center: Choose Claude Usage Display | 选择 Claude 显示剩余或已使用百分比。 |
 | Agent Center: Test Google Website Connectivity | 立即运行扩展宿主的 Google 联网检测。 |
 | Agent Center: Refresh Clash Node Speed | 刷新 Clash 状态并检测当前选择节点的 Google 延迟。 |
+| Agent Center: Start Clash Proxy | 开启当前环境的 Clash 代理并核验配置加载。 |
+| Agent Center: Stop Clash Proxy | 关闭 Clash 代理并确认控制器停止，保留订阅。 |
+| Agent Center: Update Current Clash Subscription | 重新下载并更新当前订阅，保留原开关状态，失败恢复。 |
 | Agent Center: Choose Clash Node | 搜索并切换手动策略组中的节点。 |
 | Agent Center: Add Clash Subscription | 粘贴链接识别名称，再选择保存或立即切换。 |
 | Agent Center: Choose Clash Subscription | 选择并应用已保存订阅。 |

@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## 0.1.24 - 2026-10-21
+
+### Added / 新增
+
+- Add Start Clash Proxy, Stop Clash Proxy and Update Current Clash Subscription to the existing native hover and command palette. Use native on/off/sub-update commands, including legacy shell integrations; keep start available while stopped.
+- 新增开启代理、关闭代理和更新当前订阅，入口位于现有原生悬浮卡片和命令面板；调用安装中的原生命令，兼容旧版 Shell 管理脚本，关闭后仍可一键开启。
+- Updating forces a running controller to load the generated configuration and verifies its nodes, preserves surviving manual selections and subscription sources, and restores the previous state on failure. Updates while stopped leave the proxy stopped.
+- 更新会让运行中的 Clash 强制加载新配置并核对实际节点，保留仍可用的手动节点和订阅来源，失败尝试恢复；关闭时更新后保持关闭。修复原生命令只生成配置但旧进程仍在使用旧节点的问题。
+
+## 0.1.23 - 2026-10-19
+
+### Fixed / 修复
+
+- Recognize custom clash-for-linux installations with per-host `runtime/hosts/<hostname>` state. Keep subscription reads, locks, writes and recovery in the running core's own directory; verify the native scripts use the same runtime before managing subscriptions or controlling the service.
+- 修复集群按主机隔离 `runtime/hosts/<主机名>` 时无法添加订阅的问题。自动推断自定义安装目录，订阅读取、锁、写入与失败恢复使用当前运行目录，执行原生命令前核对目录，防止误操作全局或其他节点的订阅。
+
 ## 0.1.22 - 2026-10-17
 
 ### Documentation / 文档

@@ -44,6 +44,10 @@ export class ClashApiClient {
     await this.request("/proxies/" + encodeURIComponent(group), "PUT", { name: node });
   }
 
+  public async reloadConfig(configPath: string): Promise<void> {
+    await this.request("/configs?force=true", "PUT", { path: configPath }, 30000);
+  }
+
   public async testDelay(node: string, url: string, timeoutMs: number): Promise<DelayResult> {
     try {
       const query = new URLSearchParams({ url, timeout: String(timeoutMs) });

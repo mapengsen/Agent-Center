@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex/Claude quotas, Google connectivity, Clash nodes and subscriptions, and file-link recovery in VS Code.",
-  "version": "0.1.22",
+  "version": "0.1.24",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -58,6 +58,18 @@
       {
         "command": "agentStatus.refreshClash",
         "title": "Agent Center: Refresh Clash Node Speed"
+      },
+      {
+        "command": "agentStatus.startClash",
+        "title": "Agent Center: Start Clash Proxy"
+      },
+      {
+        "command": "agentStatus.stopClash",
+        "title": "Agent Center: Stop Clash Proxy"
+      },
+      {
+        "command": "agentStatus.updateClashSubscription",
+        "title": "Agent Center: Update Current Clash Subscription"
       },
       {
         "command": "agentStatus.refreshNetwork",
@@ -125,13 +137,42 @@
         },
         "agentStatus.codexImageLinks.extensions": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^\\.?[a-zA-Z0-9][a-zA-Z0-9_-]*$" },
+          "items": {
+            "type": "string",
+            "pattern": "^\\.?[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+          },
           "uniqueItems": true,
           "default": [
-            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".pdf", ".svg",
-            ".md", ".markdown", ".mdx", ".rst", ".csv", ".tsv", ".html", ".htm", ".ipynb",
-            ".tex", ".bib", ".log", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".xml",
-            ".docx", ".xlsx", ".pptx"
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+            ".bmp",
+            ".ico",
+            ".pdf",
+            ".svg",
+            ".md",
+            ".markdown",
+            ".mdx",
+            ".rst",
+            ".csv",
+            ".tsv",
+            ".html",
+            ".htm",
+            ".ipynb",
+            ".tex",
+            ".bib",
+            ".log",
+            ".json",
+            ".jsonl",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".xml",
+            ".docx",
+            ".xlsx",
+            ".pptx"
           ],
           "description": "使用 code -r 补开的文件扩展名，同时控制失败日志与文本标签页两条补开流程。大小写不敏感，可带或不带前导点；列表为空则不处理任何格式。预览方式取决于 VS Code 默认编辑器及已安装的查看器扩展。"
         },
@@ -182,7 +223,7 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "description": "Linux/WSL 远程环境中的 clash-for-linux 安装目录，用于添加与切换订阅。留空根据自动识别的运行配置和常见目录查找；填写时也用于读取 runtime/config.yaml。订阅链接保存在原生 runtime/subscriptions.yaml，不写入 VS Code 设置或日志。"
+          "description": "Linux/WSL 远程环境中的 clash-for-linux 安装目录，用于订阅管理。留空根据运行配置和常见目录查找；支持 runtime/config.yaml 及 runtime/hosts/<主机名>/config.yaml。订阅保存在对应运行目录的 subscriptions.yaml，不写入 VS Code 设置或日志。"
         },
         "agentStatus.clash.group": {
           "type": "string",
@@ -282,7 +323,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/network.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },

@@ -4,6 +4,7 @@ import * as os from "node:os";
 import { JSON_SCHEMA, load } from "js-yaml";
 import type { ClashApiOptions } from "./clashApi";
 import { discoverClashConfigCandidates, type ClashDiscoveryOptions } from "./clashDiscovery";
+import { clashInstallationConfigs } from "./clashLayout";
 
 export const CLASH_TEST_URL = "https://www.gstatic.com/generate_204";
 export interface ClashSettings {
@@ -26,7 +27,8 @@ export async function loadClashConnection(
   const configuredPath = settings.configPath.trim();
   const candidates = configuredPath ? [expandHome(configuredPath, home)] : [
     ...(settings.installDirectory?.trim()
-      ? [path.join(expandHome(settings.installDirectory.trim(), home), "runtime", "config.yaml")] : []),
+      ? [...clashInstallationConfigs(expandHome(settings.installDirectory.trim(), home)),
+        path.join(expandHome(settings.installDirectory.trim(), home), "resources", "runtime.yaml")] : []),
     ...await discoverClashConfigCandidates(home, discovery),
     path.join(home, "clash-for-linux", "runtime", "config.yaml"),
     path.join(home, ".config", "mihomo", "config.yaml"),

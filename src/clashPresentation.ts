@@ -10,6 +10,12 @@ export interface ClashSnapshot {
   subscription?: string;
 }
 
+export function clashControlLinks(): string {
+  return commandLink("开启代理", "agentStatus.startClash") + " · " +
+    commandLink("关闭代理", "agentStatus.stopClash") + " · " +
+    commandLink("更新当前订阅", "agentStatus.updateClashSubscription");
+}
+
 export function formatClashDelay(result: DelayResult): string {
   return result.ok ? "√ Google（" + result.ms + " ms）" : "× 超时";
 }
@@ -26,6 +32,7 @@ export function clashTooltip(snapshot: ClashSnapshot): string {
   ];
   if (!delay.ok) lines.push("失败原因：" + escapeMarkdown(delay.error));
   if (snapshot.subscription) lines.push("**当前订阅**：" + escapeMarkdown(snapshot.subscription));
+  lines.push(clashControlLinks());
   if (state.mode === "rule") lines.push("显示所选策略组的节点；其他规则可能使用其他策略组。");
   const proxy = state.proxies[group];
   if (proxy?.type === "Selector" && proxy.all?.length) {

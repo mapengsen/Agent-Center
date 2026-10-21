@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { clashInstallationConfigs } from "./clashLayout";
 
 export interface ClashDiscoveryOptions {
   platform?: NodeJS.Platform;
@@ -46,6 +47,7 @@ export async function discoverClashConfigCandidates(home: string, options: Clash
     const shellFiles = options.shellFiles ?? [
       path.join(home, ".bashrc"), path.join(home, ".bash_profile"), path.join(home, ".profile"),
       path.join(home, ".zshrc"), "/etc/profile.d/clash.sh", "/etc/profile.d/clashctl.sh",
+      path.join(home, ".config", "clash-for-linux", "profile.sh"),
     ];
     for (const file of shellFiles) {
       try { candidates.push(...launcherConfigs(await readSmall(file, 256 * 1024))); }
@@ -100,8 +102,11 @@ function launcherConfigs(text: string): string[] {
   // Only literal absolute paths are used; no shell interpolation, eval or command execution.
   for (const line of text.split(/\r?\n/)) {
     if (line.trimStart().startsWith("#")) continue;
-    for (const match of line.matchAll(/((?:[A-Za-z]:)?\/[^\r\n"'`$;|&<>]*?)\/scripts\/(?:core|cmd)\/clashctl\.sh/g)) {
-      candidates.push(path.join(match[1], "runtime", "config.yaml"));
+    for (const match of line.matchAll(/((?:[A-Za-z]:)?\/[^\r\n"'`$;|&<>]*?)\/scripts\/(core|cmd)\/clashctl\.sh/g)) {
+      candidates.push(path.join(match[1], match[2] === "cmd" ? "resources" : "runtime", match[2] === "cmd" ? "runtime.yaml" : "config.yaml"));
+    }
+    for (const match of line.matchAll(/((?:[A-Za-z]:)?\/[^\r\n"'`$;|&<>]*?)\/scripts\/core\/alias\.sh/g)) {
+      candidates.push(...clashInstallationConfigs(match[1]));
     }
     const binary = line.match(/^((?:[A-Za-z]:)?\/[^\r\n"'`$;|&<>]+)\/runtime\/bin\/(?:mihomo|clash)(?:[-_.][^/]*)?$/i);
     if (binary) candidates.push(path.join(binary[1], "runtime", "config.yaml"));

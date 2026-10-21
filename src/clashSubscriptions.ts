@@ -8,18 +8,28 @@ import axios from "axios";
 import { JSON_SCHEMA, load } from "js-yaml";
 import { ClashApiClient, type ClashProxies } from "./clashApi";
 import type { ClashConnection } from "./clashConfig";
+import { clashInstallationConfigs, clashInstallationLayout } from "./clashLayout";
+import { withClashLock, loadAndVerifyClashConfig } from "./clashRuntime";
 
 export interface ClashSubscription { name: string; displayName: string; hostname?: string; enabled: boolean; type: string }
 export interface SubscriptionList { active: string; sources: ClashSubscription[] }
 export interface SubscriptionRemoval { active: string; stopped: boolean }
-export type SubscriptionRunner = (root: string, action: "add" | "use" | "remove" | "start" | "stop", name: string, url?: string) => Promise<void>;
+export type SubscriptionRunner = (root: string, action: "add" | "use" | "remove" | "start" | "stop" | "update", name: string, url?: string, runtimeDirectory?: string) => Promise<void>;
 
 /** URLs stay in the native subscription file; list/diagnostic results never expose them. */
 export class ClashSubscriptions {
-  public constructor(public readonly root: string, private readonly run: SubscriptionRunner = runSubscriptionCommand) {}
+  public constructor(
+    public readonly root: string,
+    private readonly run: SubscriptionRunner = runSubscriptionCommand,
+    public readonly runtimeDirectory = path.join(root, "runtime"),
+  ) {}
+
+  private execute(action: Parameters<SubscriptionRunner>[1], name: string, url?: string): Promise<void> {
+    return this.run(this.root, action, name, url, this.runtimeDirectory);
+  }
 
   public async list(options: { resolveNames?: boolean } = {}): Promise<SubscriptionList> {
-    const file = path.join(this.root, "runtime", "subscriptions.yaml");
+    const file = path.join(this.runtimeDirectory, "subscriptions.yaml");
     const stat = await fs.stat(file);
     if (!stat.isFile() || stat.size > 4 * 1024 * 1024) throw new Error("订阅列表文件过大或无效。");
     let value: unknown;
@@ -66,7 +76,7 @@ export class ClashSubscriptions {
       // Recheck under the lock: another window may have saved the suggested name.
       if (options.uniqueName) name = availableSubscriptionName(name, before.sources.map((source) => source.name));
       if (before.sources.some((source) => source.name === name)) throw new Error("订阅名称已存在，请使用其他名称。");
-      await this.run(this.root, "add", name, normalized);
+      await this.execute("add", name, normalized);
       const after = await this.list();
       if (!after.sources.some((source) => source.name === name) || after.active !== before.active) {
         throw new Error("未能确认订阅保存结果，请检查 Clash 订阅列表。");
@@ -92,22 +102,23 @@ export class ClashSubscriptions {
       catch { /* A stopped controller must still allow applying and starting a subscription. */ }
     }
     if (before.active === name && previousNodes) return;
-    const file = path.join(this.root, "runtime", "subscriptions.yaml");
+    const file = path.join(this.runtimeDirectory, "subscriptions.yaml");
     const backup = await fs.readFile(file);
     try {
-      await this.run(this.root, "use", name);
+      await this.execute("use", name);
       if ((await this.list()).active !== name) throw new Error();
-      if (!previousNodes) await this.run(this.root, "start", "");
+      if (!previousNodes) await this.execute("start", "");
       await this.waitForController(api);
+      if (connection.configPath) await loadAndVerifyClashConfig(connection, connection.configPath);
     } catch {
       let restored = false;
       try {
         await atomicWrite(file, backup);
-        if (previousActive) await this.run(this.root, "use", previousActive);
+        if (previousActive) await this.execute("use", previousActive);
         if (previousNodes) {
           await this.waitForController(api);
           await this.restoreNodes(api, previousNodes);
-        } else await this.run(this.root, "stop", "");
+        } else await this.execute("stop", "");
         restored = (await this.list()).active === before.active;
       } catch { /* Recovery errors must not expose native output or subscription URLs. */ }
       throw new Error(restored
@@ -132,12 +143,12 @@ export class ClashSubscriptions {
           await this.switchUnlocked(next.name, connection);
           active = next.name;
         } else {
-          await this.run(this.root, "stop", "");
+          await this.execute("stop", "");
           active = "";
           stopped = true;
         }
       }
-      await this.run(this.root, "remove", name);
+      await this.execute("remove", name);
       const after = await this.list();
       if (after.sources.some((source) => source.name === name) || after.active !== active) {
         throw new Error("未能确认订阅删除结果，请刷新订阅列表。");
@@ -169,15 +180,7 @@ export class ClashSubscriptions {
   }
 
   private async lock<T>(operation: () => Promise<T>): Promise<T> {
-    const file = path.join(this.root, "runtime", ".agent-center-subscriptions.lock");
-    let handle;
-    try { handle = await fs.open(file, "wx", 0o600); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("另一个窗口正在管理订阅，请稍后重试。");
-      throw new Error("无法写入 Clash 目录，请检查当前远程用户权限。");
-    }
-    try { return await operation(); }
-    finally { await handle.close(); await fs.unlink(file); }
+    return withClashLock(this.runtimeDirectory, operation);
   }
 }
 
@@ -249,18 +252,37 @@ function availableSubscriptionName(title: string, existing: string[]): string {
 
 export async function discoverClashSubscriptions(
   configPath: string, installDirectory = "", home = os.homedir(),
+  options: { platform?: NodeJS.Platform; hostname?: string } = {},
 ): Promise<ClashSubscriptions> {
-  if (process.platform === "win32") throw new Error("订阅管理需要运行于 Linux/WSL 的 clash-for-linux 环境，请在远程窗口使用。");
+  if ((options.platform ?? process.platform) === "win32") throw new Error("订阅管理需要运行于 Linux/WSL 的 clash-for-linux 环境，请在远程窗口使用。");
+  const layout = clashInstallationLayout(configPath);
+  const hostname = options.hostname ?? os.hostname();
   const roots = installDirectory.trim() ? [expandHome(installDirectory.trim(), home)] : [
-    ...(path.basename(path.dirname(configPath)) === "runtime" ? [path.dirname(path.dirname(configPath))] : []),
+    ...(layout ? [layout.root] : []),
     path.join(home, "clash-for-linux"), path.join(home, ".local", "share", "clash-for-linux"), "/opt/clash-for-linux",
   ];
-  for (const root of roots) {
+  for (const root of new Set(roots)) {
+    let matchedLayout = Boolean(layout && path.resolve(layout.root) === path.resolve(root));
+    if (layout && !matchedLayout) {
+      try { matchedLayout = await fs.realpath(layout.root) === await fs.realpath(root); }
+      catch { /* An unavailable inferred root must not mask a valid explicit installation. */ }
+    }
+    if (matchedLayout && layout?.host && layout.host !== hostname.split(".")[0]) {
+      throw new Error("配置属于其他主机的 Clash 运行目录，请连接对应主机后管理订阅。");
+    }
     try {
-      for (const rel of ["scripts/core/clashctl.sh", "scripts/core/config.sh", "runtime/bin/yq", "runtime/subscriptions.yaml"]) {
+      for (const rel of ["scripts/core/clashctl.sh", "scripts/core/common.sh", "scripts/core/config.sh", "runtime/bin/yq"]) {
         if (!(await fs.stat(path.join(root, rel))).isFile()) throw new Error();
       }
-      return new ClashSubscriptions(root);
+      // A live config binds all reads, locks and recovery to its own runtime.
+      const runtimes = matchedLayout ? [layout!.runtimeDirectory]
+        : clashInstallationConfigs(root, hostname).map((file) => path.dirname(file));
+      for (const runtime of runtimes) {
+        try {
+          if (!(await fs.stat(path.join(runtime, "subscriptions.yaml"))).isFile()) continue;
+        } catch { continue; }
+        return new ClashSubscriptions(root, runSubscriptionCommand, runtime);
+      }
     } catch { /* Try the next installation. */ }
   }
   throw new Error("未找到兼容的 clash-for-linux 订阅管理目录，请设置 agentStatus.clash.installDirectory。");
@@ -292,6 +314,7 @@ const ADD_SCRIPT = [
   'init_project_context "$PROJECT_DIR"',
   "load_env_if_exists",
   "detect_install_scope auto",
+  'if [ -n "${3:-}" ] && ! [ "$RUNTIME_DIR" -ef "$3" ]; then exit 65; fi',
   "IFS= read -r agent_center_url",
   'set_subscription "$agent_center_url" clash "$2" false',
 ].join("\n");
@@ -307,17 +330,37 @@ const REMOVE_SCRIPT = [
   'init_project_context "$PROJECT_DIR"',
   "load_env_if_exists",
   "detect_install_scope auto",
+  'if [ -n "${3:-}" ] && ! [ "$RUNTIME_DIR" -ef "$3" ]; then exit 65; fi',
   'NAME="$2" "$(yq_bin)" eval -i \'del(.sources[env(NAME)]) | with(select((.sources[.active] == null) or (.sources[.active].enabled == false)); .active = "")\' "$(subscriptions_file)"',
   'clear_subscription_health_all_fields "$2" || true',
 ].join("\n");
 
+const CONTROL_SCRIPT = [
+  "set -euo pipefail",
+  'PROJECT_DIR="$1"',
+  'source "$PROJECT_DIR/scripts/core/common.sh"',
+  'source "$PROJECT_DIR/scripts/core/config.sh"',
+  'init_project_context "$PROJECT_DIR"',
+  "load_env_if_exists",
+  "detect_install_scope auto",
+  '[ "$RUNTIME_DIR" -ef "$3" ] || exit 65',
+  'if [ "$4" = use ]; then exec /bin/bash "$PROJECT_DIR/scripts/core/clashctl.sh" use "$2"; fi',
+  'if [ "$4" = sub ]; then exec /bin/bash "$PROJECT_DIR/scripts/core/clashctl.sh" sub update; fi',
+  'exec /bin/bash "$PROJECT_DIR/scripts/core/clashctl.sh" "$4"',
+].join("\n");
+
 export async function runSubscriptionCommand(
-  root: string, action: "add" | "use" | "remove" | "start" | "stop", name: string, url?: string,
+  root: string, action: Parameters<SubscriptionRunner>[1], name: string, url?: string, runtimeDirectory?: string,
 ): Promise<void> {
-  const args = action === "add" ? ["-c", ADD_SCRIPT, "agent-center", root, name]
-    : action === "use" ? [path.join(root, "scripts", "core", "clashctl.sh"), "use", name]
-    : action === "remove" ? ["-c", REMOVE_SCRIPT, "agent-center", root, name]
-    : [path.join(root, "scripts", "core", "clashctl.sh"), action === "start" ? "on" : "off"];
+  const command = action === "use" ? "use" : action === "start" ? "on" : action === "update" ? "sub" : "off";
+  const args = action === "add" || action === "remove"
+    ? ["-c", action === "add" ? ADD_SCRIPT : REMOVE_SCRIPT, "agent-center", root, name, runtimeDirectory ?? ""]
+    : runtimeDirectory ? ["-c", CONTROL_SCRIPT, "agent-center", root, name, runtimeDirectory, command]
+    : [path.join(root, "scripts", "core", "clashctl.sh"), command, ...(action === "use" ? [name] : action === "update" ? ["update"] : [])];
+  await runClashBash(root, args, action === "add" ? url + "\n" : undefined);
+}
+
+export async function runClashBash(root: string, args: string[], input?: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const env = { ...process.env };
     // Do not inherit shell tracing/startup hooks which could print the URL.
@@ -337,7 +380,7 @@ export async function runSubscriptionCommand(
       else reject(new Error(timedOut ? "订阅操作超时。" : "clash-for-linux 订阅命令执行失败。"));
     });
     child.stdin.on("error", () => { /* Child exit is reported by close. */ });
-    child.stdin.end(action === "add" ? url + "\n" : undefined);
+    child.stdin.end(input);
   });
 }
 
