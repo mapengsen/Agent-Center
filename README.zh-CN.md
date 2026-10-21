@@ -2,7 +2,7 @@
 
 语言：<a href="https://github.com/mapengsen/Agent-Center/tree/main">English（默认）</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center 将 Codex / Claude 使用额度、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
+Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共用、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -12,6 +12,7 @@ Agent Center 将 Codex / Claude 使用额度、VS Code 联网状态、Clash/Miho
 
 | 功能 | 可以做什么 |
 | --- | --- |
+| Codex 服务商切换与历史共用 | 选择官方 ChatGPT 登录，或输入 API 服务商 ID（例如 `beeapi`）。已有配置直接使用，新服务商提示填写接口地址和隐藏输入的 API Key；切换后全部已索引本地历史对所选服务商可见，切换前备份，失败恢复。 |
 | Codex 使用额度 | 查看剩余或已使用百分比、短窗口与长窗口、重置时间，以及账户邮箱和套餐。 |
 | Claude 使用额度 | 查看接口返回的 5 小时、7 天、Opus、Sonnet 额度窗口，以及订阅和重置时间。 |
 | 额度显示与刷新 | 为两个服务分别选择剩余/已使用模式，用彩色标记查看使用程度；支持点击刷新、定时刷新和失败重试。 |
@@ -30,6 +31,7 @@ Agent Center 将 Codex / Claude 使用额度、VS Code 联网状态、Clash/Miho
 2. 查看额度时，在同一环境通过 `codex login` 或 `claude /login` 登录。插件读取该环境已有的 CLI 凭据；某个服务没有可用凭据时，会隐藏对应额度项。
 3. Google 联网检测无需 Clash 或 API Key。节点显示与切换需要正在运行且控制器可访问的 Clash/Mihomo；订阅管理还需要兼容的 clash-for-linux。
 4. 悬停额度项查看详情，点击额度项刷新。悬停或点击 Google/Clash 状态项，在右下角状态栏上方展开原生卡片，操作联网检测、节点和订阅。
+5. 点击 **OpenAI 官方 / 服务商 ID** 状态项，或运行 **Agent Center: Switch Codex Provider**。切换功能需要当前扩展宿主安装 **Python 3.8+（含 sqlite3）**，切换后重新加载 VS Code 窗口生效。
 
 | 自动任务 | 默认频率 | 手动入口 |
 | --- | --- | --- |
@@ -40,6 +42,19 @@ Agent Center 将 Codex / Claude 使用额度、VS Code 联网状态、Clash/Miho
 ![Agent Center 状态栏预览](image.png)
 
 上图展示额度状态项。联网与 Clash 合并显示的示例为 `✅️ 🌐 √ Google（1605 ms）`：最前面的图标表示扩展宿主检测结果，后面的延迟来自独立的 Clash 节点测速。
+
+## Codex 服务商切换与历史共用
+
+点击独立的服务商状态项、Codex 额度悬浮卡片中的“切换服务商”，或运行 **Agent Center: Switch Codex Provider**。没有可用额度凭据时，独立切换入口仍可使用。
+
+- **OpenAI 官方（ChatGPT 登录）**：选择内置 `openai` 和 ChatGPT 认证，保留已有登录文件；尚未登录时，在 Codex 中完成登录。移除用户配置中的自定义 OpenAI / ChatGPT 地址覆盖；扩展宿主存在自定义 `OPENAI_BASE_URL` 时，需要先清除该环境变量。
+- **自定义 API**：输入服务商 **ID**，不是模型或显示名称。例如 `model_provider = "beeapi"`，这里只填 `beeapi`。已有 `[model_providers.beeapi]` 配置和凭据直接使用；如果该 ID 尚未配置，会提示填写兼容 Responses API 的 Base URL 和隐藏输入的 API Key，并保存到当前环境的 Codex `config.toml`。密钥不写入 VS Code 设置或诊断日志。要求 ChatGPT 认证的自定义配置需要先改为 API 认证。
+
+**每次明确切换后，当前 `CODEX_HOME` 中全部已索引本地聊天都会共用给所选服务商，再切换仍可使用同一套历史。** 保留聊天正文、JSONL 文件、分页偏移、标题、排序、归档状态和登录文件；归档记录仍在归档列表，工作区和会话类型筛选继续生效。重新加载后，继续聊天使用所选服务商，并受其支持的模型和功能限制。此功能作用于当前环境的本地历史。额度项仍显示已保存 ChatGPT 账户的额度，自定义 API 的余额由其服务商提供。
+
+备份位于 `CODEX_HOME/agent-center/provider-backups/`，默认 `~/.codex/agent-center/provider-backups/`。保留最近 **5 次成功切换的备份**，失败备份保留用于恢复。SQLite 备份包含 WAL 数据；跨窗口锁、配置变更校验和失败恢复保护现有记录。处理只修改历史索引的服务商标记，**不会重写 JSONL 聊天文件**。请先停止正在进行的 Codex 回复，成功后点击 **重新加载窗口** 生效。
+
+当前扩展宿主需要 Python 3.8+ 和标准库 `sqlite3`；默认寻找 `python3`、`python`、Windows `py -3`，也可设置 `agentStatus.codexProvider.pythonPath`。POSIX 配置与备份使用私有权限，Windows 沿用 Codex 目录的访问控制。索引不兼容、已有聊天但缺少历史数据库、启用了配置 profile 或 TOML 格式错误时，会提示修复并停止切换。组织托管配置或自定义 Codex 启动参数中的服务商覆盖仍可能限制实际配置。
 
 ## Codex 与 Claude 使用额度
 
@@ -147,6 +162,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 | 命令 | 用途 |
 | --- | --- |
+| Agent Center: Switch Codex Provider | 选择官方 ChatGPT 或输入 API 服务商 ID，将全部已索引本地历史共用给所选服务商。 |
 | Agent Center: Refresh Codex Usage | 立即刷新当前环境的 Codex 额度。 |
 | Agent Center: Choose Codex Usage Display | 选择 Codex 显示剩余或已使用百分比。 |
 | Agent Center: Refresh Claude Usage | 立即刷新当前环境的 Claude 额度。 |
@@ -170,6 +186,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 | 设置分组 | 启用/关闭 | 其他选项 |
 | --- | --- | --- |
+| Codex 服务商切换 | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex 额度 | `agentStatus.codex.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
 | Claude 额度 | `agentStatus.claude.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
 | 扩展宿主 Google 联网检测 | `agentStatus.network.enabled` | `testTimeoutMs`、`updateIntervalSeconds` |
@@ -178,7 +195,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 最后一列的选项使用本行对应的设置前缀，例如 `agentStatus.network.updateIntervalSeconds`。Remote SSH、WSL 和容器中使用对应远程环境的设置与文件路径。未显式填写 Agent Center 额度设置时，会兼容读取已有的 Notifyer 旧版额度设置。
 
-**Agent Center: Show Diagnostics** 会在输出面板显示 `codex`、`claude`、`network`、`clash` 和 `codexImageLinks`，用于查看运行环境、最后检测结果、发现的配置和最近文件补开记录。输出不包含访问令牌、代理密码、控制器密钥或完整私密订阅链接。文件补开、联网检测和 Clash 操作需要受信任工作区。
+**Agent Center: Show Diagnostics** 会在输出面板显示 `codex`、`codexProvider`、`claude`、`network`、`clash` 和 `codexImageLinks`，用于查看当前服务商、处理的历史数量、备份位置及已有监控结果。输出不包含访问令牌、API Key、代理密码、控制器密钥或完整私密订阅链接。服务商切换、文件补开、联网检测和 Clash 操作需要受信任工作区。
 
 ## 相关插件
 
@@ -187,6 +204,18 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.25 - 2026-10-21
+
+- 新增 Codex 服务商切换、首次 API 配置、全部本地历史共用、备份与失败恢复；GitHub 和插件市场补齐完整功能说明。
+
+### 0.1.24 - 2026-10-21
+
+- 原生悬浮卡片新增开启/关闭 Clash 和更新当前订阅，核验运行配置并支持失败恢复。
+
+### 0.1.23 - 2026-10-19
+
+- 支持自定义安装路径和按主机隔离的 clash-for-linux 运行目录。
 
 ### 0.1.22 - 2026-10-17
 

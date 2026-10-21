@@ -1,5 +1,16 @@
 # Changelog / 更新日志
 
+## 0.1.25 - 2026-10-21
+
+### Added / 新增
+
+- Switch Codex between official ChatGPT login and a manually entered custom API provider ID. Reuse configured providers or enter a Base URL and masked API Key for a new one. Add a dedicated status item, quota-hover action, command and Python-path setting.
+- 新增官方 ChatGPT 与自定义 API 服务商切换：输入 `model_provider` 对应 ID（如 `beeapi`），复用已有配置，新 ID 提示填写地址和隐藏输入的 API Key；提供独立状态项、额度悬浮入口、命令和 Python 路径设置。
+- Make all indexed local histories available to the chosen provider on each explicit switch. Back up configuration and live SQLite indexes, retain five successful snapshots, lock across windows, and recover provider labels/configuration on errors. Preserve transcript bytes, pagination offsets, archives, ordering and login files. Reload VS Code after switching; Python 3.8+ with sqlite3 is required in the extension host.
+- 每次明确切换后，将全部已索引本地历史共用给所选服务商；自动备份配置与 SQLite 索引，保留最近五次成功备份，跨窗口加锁并支持失败恢复；保留聊天正文、分页偏移、归档、排序和登录文件。切换后重新加载窗口，扩展宿主需要 Python 3.8+（含 sqlite3）。
+- Update both homepages with the complete feature set, provider workflow, requirements, backup behavior, commands and settings.
+- GitHub 和插件市场的中英文主页更新全部功能、服务商操作流程、环境要求、备份行为、命令与设置。
+
 ## 0.1.24 - 2026-10-21
 
 ### Added / 新增

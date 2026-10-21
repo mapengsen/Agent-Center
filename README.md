@@ -2,7 +2,7 @@
 
 Language: <a href="https://github.com/mapengsen/Agent-Center/tree/main">English (default)</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center puts Codex and Claude usage quotas, VS Code internet connectivity, Clash/Mihomo nodes and subscription management in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
+Agent Center puts Codex and Claude usage quotas, Codex provider switching with shared history, VS Code internet connectivity, and Clash/Mihomo controls in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -12,6 +12,7 @@ Agent Center puts Codex and Claude usage quotas, VS Code internet connectivity, 
 
 | Feature | What you can do |
 | --- | --- |
+| Codex provider switching and shared history | Choose official ChatGPT login or enter a custom API provider ID, such as `beeapi`. Reuse an existing configuration, or enter a Base URL and masked API Key on first use. Every switch makes all indexed local history available to the selected provider, with backups and failure recovery. |
 | Codex usage quotas | See remaining or used percentages, short/long windows, reset times, account email and plan in the status bar and hover. |
 | Claude usage quotas | Inspect 5-hour, 7-day, Opus and Sonnet windows when returned by the service, plus subscription and reset details. |
 | Quota display and refresh | Choose remaining/used mode for each provider, see colored usage markers, click to refresh, and use automatic refresh with failure retries. |
@@ -30,6 +31,7 @@ Agent Center puts Codex and Claude usage quotas, VS Code internet connectivity, 
 2. For quotas, sign in with `codex login` or `claude /login` in the same environment. Agent Center reads that environment's existing CLI credentials. A provider's quota item stays hidden when its credentials are unavailable or unusable.
 3. Google connectivity works without Clash or an API key. For node status and switching, run Clash/Mihomo with an accessible controller; subscription management additionally needs compatible clash-for-linux.
 4. Hover over a quota item for details; click it to refresh. Hover over or click the Google/Clash item to open the native card above the bottom-right status bar, with network, node and subscription actions.
+5. Click the **OpenAI 官方 / provider ID** status item or run **Agent Center: Switch Codex Provider**. This feature requires **Python 3.8+ with sqlite3** in the extension host. Reload the VS Code window after switching.
 
 | Automatic task | Default schedule | Manual action |
 | --- | --- | --- |
@@ -40,6 +42,19 @@ Agent Center puts Codex and Claude usage quotas, VS Code internet connectivity, 
 ![Agent Center status bar preview](image.png)
 
 The image shows the quota items. A combined connectivity and Clash example is `✅️ 🌐 √ Google（1605 ms）`: the leading icon is the extension-host check, and the latency is the independent Clash node test.
+
+## Codex provider switching and shared history
+
+Click the dedicated provider status item, use the Codex quota hover action, or run **Agent Center: Switch Codex Provider**. The dedicated item is available even without quota credentials.
+
+- **OpenAI 官方（ChatGPT 登录）** selects built-in `openai` and ChatGPT authentication, retaining existing login files. Complete ChatGPT login in Codex if needed. User-level custom OpenAI/ChatGPT endpoint overrides are removed; a custom `OPENAI_BASE_URL` environment override must be cleared first.
+- **自定义 API** asks for the provider **ID**, not a model or display name. For `model_provider = "beeapi"`, enter `beeapi`. Existing `[model_providers.beeapi]` settings and credentials are reused. For a new ID, enter a Responses-compatible Base URL and a masked API Key; these are saved in the current environment's `config.toml`, never in VS Code settings or diagnostics. Custom providers requiring ChatGPT authentication must be configured for API authentication first.
+
+Each explicit switch updates the provider label of **all indexed local threads in the current `CODEX_HOME`** so the same history is available whichever provider you select. Conversation bodies, JSONL files, pagination offsets, titles, order, archives and login files are preserved. Archived chats remain in their archived list; workspace and thread-type filters still apply. Continuing a chat after reload uses the selected provider, subject to its model and feature support. The scope is this environment's local history. The quota item still reports the saved ChatGPT account's quota, independently of custom API balances.
+
+Backups are saved to `CODEX_HOME/agent-center/provider-backups/` (default `~/.codex/agent-center/provider-backups/`). The last **five successful switch backups** are retained; failed-switch backups are kept for recovery. SQLite backups include WAL data; cross-window locks, configuration-change checks and rollback protect existing records. Only history index labels change; transcripts are never rewritten. Stop active Codex replies before switching, then choose **重新加载窗口** after success.
+
+Install Python 3.8+ with `sqlite3` on the extension host, or set `agentStatus.codexProvider.pythonPath`. Automatic discovery tries `python3`, `python` and Windows `py -3`. POSIX config and backups use private permissions; Windows uses the Codex directory's ACLs. Incompatible indexes, legacy transcripts without an index, active config profiles and malformed TOML produce an error before switching. Managed settings or custom Codex launch flags can still override provider selection.
 
 ## Codex and Claude usage quotas
 
@@ -145,6 +160,7 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 
 | Command | Purpose |
 | --- | --- |
+| Agent Center: Switch Codex Provider | Choose official ChatGPT or enter an API ID; share all indexed local history with the selected provider. |
 | Agent Center: Refresh Codex Usage | Refresh the current environment's Codex quota. |
 | Agent Center: Choose Codex Usage Display | Choose remaining or used percentage for Codex. |
 | Agent Center: Refresh Claude Usage | Refresh the current environment's Claude quota. |
@@ -168,6 +184,7 @@ Search for **Agent Center** in Settings, or run **Agent Center: Open Settings**.
 
 | Settings group | Enable/disable | Other options |
 | --- | --- | --- |
+| Codex provider switching | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex quota | `agentStatus.codex.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
 | Claude quota | `agentStatus.claude.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
 | Extension-host Google check | `agentStatus.network.enabled` | `testTimeoutMs`, `updateIntervalSeconds` |
@@ -176,7 +193,7 @@ Search for **Agent Center** in Settings, or run **Agent Center: Open Settings**.
 
 Each option in the last column uses its row's prefix, for example `agentStatus.network.updateIntervalSeconds`. With Remote SSH, WSL or containers, use the current remote environment's settings and paths. Existing legacy Notifyer quota settings are used as fallbacks when the corresponding Agent Center setting is not explicitly configured.
 
-**Agent Center: Show Diagnostics** opens the output channel with `codex`, `claude`, `network`, `clash` and `codexImageLinks` results. Use it to identify the active extension host, last check, detected configuration and recent file-recovery results. The output omits access tokens, proxy passwords, controller secrets and complete private subscription URLs. File-opening, network and Clash operations require a trusted workspace.
+**Agent Center: Show Diagnostics** opens the output channel with `codex`, `codexProvider`, `claude`, `network`, `clash` and `codexImageLinks` results. Inspect the active provider, history count, backup location and existing monitor results. Output omits access tokens, API keys, proxy passwords, controller secrets and complete private subscription URLs. Provider switching, file-opening, network and Clash operations require a trusted workspace.
 
 ## Related extension
 
@@ -185,6 +202,18 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.25 - 2026-10-21
+
+- Add Codex provider switching, first-use API setup, shared local history, backups and recovery. Update the complete feature overview on GitHub and the Marketplace.
+
+### 0.1.24 - 2026-10-21
+
+- Start/stop Clash and update the current subscription from the native hover, with verified live reload and failure recovery.
+
+### 0.1.23 - 2026-10-19
+
+- Support custom per-host clash-for-linux runtime directories.
 
 ### 0.1.22 - 2026-10-17
 

@@ -4,6 +4,7 @@ import { CodexUsageMonitor } from "./codexUsage";
 import { CodexImageLinkMonitor } from "./codexImageLinks";
 import { ClashStatusMonitor } from "./clashStatus";
 import { NetworkStatusMonitor } from "./networkStatus";
+import { CodexProviderSwitcher } from "./codexProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
   const codexUsage = new CodexUsageMonitor();
@@ -12,6 +13,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const clashStatus = new ClashStatusMonitor();
   const networkStatus = new NetworkStatusMonitor((status) => clashStatus.setNetworkStatus(status));
   const diagnostics = vscode.window.createOutputChannel("Agent Center");
+  const codexProvider = new CodexProviderSwitcher(context);
 
   context.subscriptions.push(
     codexUsage,
@@ -20,6 +22,8 @@ export function activate(context: vscode.ExtensionContext): void {
     clashStatus,
     networkStatus,
     diagnostics,
+    codexProvider,
+    vscode.commands.registerCommand("agentStatus.switchCodexProvider", () => codexProvider.choose()),
     vscode.commands.registerCommand("agentStatus.refreshCodexUsage", () => codexUsage.refresh("manual")),
     vscode.commands.registerCommand("agentStatus.restartCodexImageLinks", () => codexImageLinks.restart()),
     vscode.commands.registerCommand("agentStatus.refreshClash", () => clashStatus.refresh("manual")),
@@ -49,6 +53,7 @@ export function activate(context: vscode.ExtensionContext): void {
       diagnostics.appendLine(JSON.stringify({
         extensionHost: vscode.env.remoteName ?? "local",
         codex: codexUsage.getDiagnostics(),
+        codexProvider: codexProvider.getDiagnostics(),
         claude: claudeUsage.getDiagnostics(),
         clash: clashStatus.getDiagnostics(),
         network: networkStatus.getDiagnostics(),
@@ -57,6 +62,7 @@ export function activate(context: vscode.ExtensionContext): void {
       diagnostics.show(true);
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("agentStatus.codexProvider")) void codexProvider.refresh();
       if (event.affectsConfiguration("agentStatus.codexImageLinks") ||
           event.affectsConfiguration("codexImageOpener.enabled")) {
         void codexImageLinks.restart();
@@ -106,6 +112,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   codexUsage.start();
+  codexProvider.start();
   claudeUsage.start();
   void codexImageLinks.restart();
   clashStatus.start();

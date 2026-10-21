@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "Codex/Claude quotas, Google connectivity, Clash nodes and subscriptions, and file-link recovery in VS Code.",
-  "version": "0.1.24",
+  "description": "Codex/Claude quotas, Codex provider switching with shared history, Google connectivity, Clash controls and file-link recovery.",
+  "version": "0.1.25",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -51,6 +51,10 @@
       }
     },
     "commands": [
+      {
+        "command": "agentStatus.switchCodexProvider",
+        "title": "Agent Center: Switch Codex Provider"
+      },
       {
         "command": "agentStatus.restartCodexImageLinks",
         "title": "Agent Center: Restart Codex File Link Listener"
@@ -317,17 +321,29 @@
           "default": "",
           "scope": "machine-overridable",
           "description": "当前环境请求 Claude 额度时使用的 HTTP/HTTPS 代理，例如 http://127.0.0.1:7890。留空时保留环境代理行为。"
+        },
+        "agentStatus.codexProvider.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "在状态栏提供 Codex 服务商切换入口；官方 ChatGPT 登录与自己输入的 API 服务商 ID 共用全部已索引本地历史。切换前备份，切换后重新加载窗口。"
+        },
+        "agentStatus.codexProvider.pythonPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "当前扩展宿主中 Python 3.8+ 的可执行文件路径（需要 sqlite3）。留空依次查找 python3、python 和 Windows py -3；用于安全更新 Codex 历史索引。"
         }
       }
     }
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },
   "dependencies": {
+    "@iarna/toml": "2.2.5",
     "axios": "^1.7.9",
     "js-yaml": "^4.3.1"
   },

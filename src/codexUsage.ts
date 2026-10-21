@@ -204,7 +204,7 @@ function buildTooltip(snapshot: CodexUsageSnapshot, displayMode: UsageDisplayMod
   appendWindow(tooltip, TOOLTIP_EMOJI.shortWindow, "短窗口", snapshot.primary, displayMode);
   appendWindow(tooltip, TOOLTIP_EMOJI.longWindow, "长窗口", snapshot.secondary, displayMode);
   tooltip.appendMarkdown(`${TOOLTIP_EMOJI.updated} **最后更新**：${snapshot.updatedAt.toLocaleTimeString()}（当前运行环境时区）\n\n`);
-  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.refresh} [立即刷新](command:agentStatus.refreshCodexUsage) · ${TOOLTIP_EMOJI.displayMode} [切换显示](command:agentStatus.chooseCodexUsageDisplayMode) · ${TOOLTIP_EMOJI.settings} [打开设置](command:agentStatus.openSettings)`);
+  tooltip.appendMarkdown(`${TOOLTIP_EMOJI.refresh} [立即刷新](command:agentStatus.refreshCodexUsage) · [切换服务商](command:agentStatus.switchCodexProvider) · ${TOOLTIP_EMOJI.displayMode} [切换显示](command:agentStatus.chooseCodexUsageDisplayMode) · ${TOOLTIP_EMOJI.settings} [打开设置](command:agentStatus.openSettings)`);
   return tooltip;
 }
 
