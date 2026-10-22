@@ -22,7 +22,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Test all Clash nodes in parallel | Manually test all concrete nodes loaded by the current Clash core, up to five at a time. Show sorted results in the existing hover, support cancellation and send no node-selection commands. |
 | Test and select the best node | Run a fresh batch and select the successful node with the lowest Google latency reachable through the current group's manual selectors. Support nested selectors, verify the effective node and attempt recovery on failure. |
 | Start and stop the proxy | Use native Clash controls in the same hover, verify the controller starts or stops, retain subscriptions and keep the start action available while stopped. |
-| Update the current subscription | Download the saved active source again, force-load and verify the running configuration, preserve available manual choices and restore the previous state on failure. Updates while stopped keep the service stopped. |
+| Update the current subscription | Download, force-load and verify the active source, preserving available manual choices. After success, immediately refresh Google connectivity, current-node state and all loaded node delays without selecting a new node. Restore on update failure; updates while stopped keep the service stopped. |
 | Use subscription DNS | Remove conflicting local DNS resolution overrides, keep host DNS enable/listen/IPv6 settings, update the active source and verify the generated DNS policy. Preserve backups, support restoring original DNS overrides and check a complete Google webpage through the current local proxy. Linux/WSL only. |
 | Add, switch and delete subscriptions | Paste a URL to detect its name, save without switching or apply immediately, view the active subscription, and delete any subscription. Deleting the active source switches to the next enabled one; without a replacement, Clash stops. Requires compatible clash-for-linux. |
 | Recover Codex file links | Open supported absolute file links with `code -r`, including images, PDF, SVG, Markdown, CSV, TOML and Office files: **30 default formats**, with a configurable list. Recover failed opens and clean text tabs; preserve unsaved edits and prevent reopen loops. |
@@ -40,8 +40,8 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | --- | --- | --- |
 | Codex quota | At startup, three more checks 60 seconds apart, then every **3 minutes**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
 | Claude quota | At startup, three more checks 60 seconds apart, then every **15 minutes**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
-| VS Code host → Google | At startup, then every **5 hours**. | Choose “立即检测联网” in the hover card. |
-| Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. | Choose “刷新测速” in the hover card. |
+| VS Code host → Google | At startup, then every **5 hours**, and immediately after a successful subscription update. | Choose “立即检测联网” in the hover card. |
+| Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. Successful subscription updates additionally test all loaded nodes in parallel. | Choose “刷新测速” in the hover card. |
 
 ![Agent Center status bar preview](image.png)
 
@@ -122,6 +122,10 @@ The existing status-bar hover includes **开启代理**, **关闭代理** and **
 
 Running updates force-load the generated configuration and verify its live nodes and groups. Manual choices that still exist are preserved. Failures attempt to restore the original configuration, subscriptions, choices and service state; updates started while stopped keep the service stopped. Native per-host runtimes and legacy `scripts/cmd/clashctl.sh` installations are supported for these three actions.
 
+After a successful update, old delay results are discarded, current node/subscription state is reloaded and all newly loaded concrete nodes are tested with up to five requests in parallel. The extension-host Google check restarts alongside this workflow, cancelling any request begun before the update rather than reusing it. New results update the existing hover and timestamps immediately, without waiting for the five-minute or five-hour schedules. This is test-only; it does not select the best node.
+
+Updates while stopped still refresh host connectivity but do not start the proxy for delay testing. A failed subscription update does not launch this full refresh. Post-update connectivity or latency errors are reported separately and do not undo a successful subscription update. Existing feature switches and periodic schedules remain in effect.
+
 Controls operate in the current Linux/WSL extension host. Native scripts manage the service and persistent proxy state; child processes cannot rewrite environment variables of already-running terminals or VS Code. Reopen a terminal or reconnect the remote window when needed. The Google connectivity badge keeps its independent check schedule.
 
 ### Add, switch and delete subscription sources
@@ -201,7 +205,7 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 | Agent Center: Cancel Clash Node Tests | Cancel the current all-node batch, retaining completed results. |
 | Agent Center: Start Clash Proxy | Start the current environment's native proxy and verify its loaded configuration. |
 | Agent Center: Stop Clash Proxy | Stop the proxy, verify the controller stops and retain subscriptions. |
-| Agent Center: Update Current Clash Subscription | Refresh the saved active source, preserve its on/off state and recover on failure. |
+| Agent Center: Update Current Clash Subscription | Refresh the active source while preserving its on/off state; immediately refresh host/current/all-node tests after success and recover on update failure. |
 | Agent Center: Use Subscription DNS | Persist subscription DNS priority, update/verify the active source and report a webpage check through Clash. |
 | Agent Center: Restore Clash DNS Overrides | Restore backed-up DNS overrides while retaining later unrelated edits and the proxy's on/off state. |
 | Agent Center: Choose Clash Node | Search for and switch a node in a manual selector group. |
@@ -236,6 +240,10 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.31 - 2026-10-22
+
+- Immediately refresh host Google connectivity, current state and all loaded node delays after a successful subscription update. Restart stale host requests without selecting a new node; retain periodic schedules, the stopped state and update recovery.
 
 ### 0.1.30 - 2026-10-22
 

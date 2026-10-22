@@ -35,6 +35,15 @@ export class NetworkStatusMonitor implements vscode.Disposable {
     return this.pending;
   }
 
+  public async refreshAfterProxyChange(): Promise<void> {
+    const generation = this.generation;
+    if (!this.active(generation)) return;
+    // Do not reuse a request started before the new proxy configuration loaded.
+    this.abort?.abort();
+    await this.pending;
+    if (this.active(generation)) await this.refresh("manual");
+  }
+
   private async update(generation: number, signal: AbortSignal): Promise<void> {
     let result: NetworkProbeResult;
     try {
@@ -42,7 +51,7 @@ export class NetworkStatusMonitor implements vscode.Disposable {
     } catch {
       result = { status: "error", detail: "连接失败", elapsedMs: 0 };
     }
-    if (!this.active(generation)) return;
+    if (!this.active(generation) || signal.aborted) return;
     this.result = result;
     this.updatedAt = new Date();
     const http = result.httpStatus === undefined ? "" : "HTTP " + result.httpStatus;
@@ -53,7 +62,7 @@ export class NetworkStatusMonitor implements vscode.Disposable {
       "检测地址：" + GOOGLE_WEB_URL,
       "检测位置：" + (vscode.env.remoteName ? "远程扩展宿主（" + escapeMarkdown(vscode.env.remoteName) + "）" : "本地扩展宿主"),
       "收到任意 HTTP 响应即显示 ✅️，包括跳转、403 和 5xx；仅代表收到响应，不保证网页功能可用。沿用当前扩展宿主的 VS Code/环境代理设置，独立于 Clash 节点测速。",
-      "更新于 " + this.updatedAt.toISOString() + " · " + intervalLabel(),
+      "更新于 " + this.updatedAt.toISOString() + " · " + intervalLabel() + "；更新订阅成功后立即检测",
       commandLink("立即检测联网", "agentStatus.refreshNetwork") + " · " + commandLink("设置", "agentStatus.openSettings"),
     ].filter(Boolean).join("\n\n");
     this.onChange({ icon: result.status === "available" ? "✅️" : "❌", tooltip });

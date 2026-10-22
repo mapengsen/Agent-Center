@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const codexUsage = new CodexUsageMonitor();
   const claudeUsage = new ClaudeUsageMonitor();
   const codexImageLinks = new CodexImageLinkMonitor(context);
-  const clashStatus = new ClashStatusMonitor();
+  const clashStatus = new ClashStatusMonitor(() => networkStatus.refreshAfterProxyChange());
   const networkStatus = new NetworkStatusMonitor((status) => clashStatus.setNetworkStatus(status));
   const diagnostics = vscode.window.createOutputChannel("Agent Center");
   const codexProvider = new CodexProviderSwitcher(context);

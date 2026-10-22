@@ -152,10 +152,14 @@ async function monitorHarness(t: TestContext) {
   const picks: Array<{ label: string; value: string } | undefined> = [];
   const shownPicks: Array<Array<{ label: string; value: string; description?: string; detail?: string }>> = [];
   const notices: string[] = [];
+  let completeFirstNodeBatch!: () => void;
+  const firstNodeBatchCompleted = new Promise<void>((resolve) => { completeFirstNodeBatch = resolve; });
   const errors: string[] = [];
   const warnings: string[] = [];
   const commands: string[] = [];
   const progressCancellations = new Set<() => void>();
+  let hostRefreshCount = 0;
+  let hostRefresh = async () => {};
   const subscriptionCalls: Array<{ action: string; name: string }> = [];
   const controlCalls: string[] = [];
   const control = {
@@ -207,7 +211,10 @@ async function monitorHarness(t: TestContext) {
         isCancellationRequested: false,
         onCancellationRequested: (listener: () => void) => { progressCancellations.add(listener); return { dispose: () => progressCancellations.delete(listener) }; },
       }),
-      showInformationMessage: async (text: string) => { notices.push(text); }, showErrorMessage: async (text: string) => { errors.push(text); },
+      showInformationMessage: async (text: string) => {
+        notices.push(text);
+        if (text.startsWith("Clash 全部节点测速完成：")) completeFirstNodeBatch();
+      }, showErrorMessage: async (text: string) => { errors.push(text); },
     },
   };
   const entry = require.resolve("../clashStatus");
@@ -225,10 +232,12 @@ async function monitorHarness(t: TestContext) {
         : name === "./clashRuntime" ? { ...realRequire(name), controllerListening: async () => running } : realRequire(name),
     setTimeout, clearTimeout, AbortController,
   }, { filename: entry });
-  const monitor = new module.exports.ClashStatusMonitor();
+  const monitor = new module.exports.ClashStatusMonitor(async () => { hostRefreshCount++; await hostRefresh(); });
   t.after(() => monitor.dispose());
   return { monitor, state, writes, bar, fakeVscode, config, api, inputs, picks, shownInputs, shownPicks, subscriptions, subscriptionCalls,
     notices, warnings, errors, commands, control, controlCalls, cancelProgress: () => progressCancellations.forEach((listener) => listener()),
+    hostRefreshes: () => hostRefreshCount, setHostRefresh: (refresh: () => Promise<void>) => { hostRefresh = refresh; },
+    firstNodeBatchCompleted,
     shown: () => shown, failDelay: () => { timeout = true; } };
 }
 
@@ -272,7 +281,8 @@ test("all-node testing uses the hover, labels each result and preserves the curr
   await h.monitor.chooseNode();
   assert.ok(h.shownPicks[0].some((item) => item.value === "node-a" && item.description?.includes("100 ms")));
   await h.monitor.manageControl("update");
-  assert.doesNotMatch((h.bar.tooltip as { value: string }).value, /\*\*全部节点测速\*\*/);
+  assert.match((h.bar.tooltip as { value: string }).value, /\*\*全部节点测速\*\*/);
+  assert.equal(h.hostRefreshes(), 1);
 });
 
 test("duplicate all-node requests share one batch and progress cancellation stops the batch", async (t) => {
@@ -358,6 +368,80 @@ test("cancelled best-node tests cannot switch and a plain batch cannot be upgrad
   assert.deepEqual(h.writes, []);
 });
 
+test("subscription update refreshes host connectivity and tests all newly loaded nodes without selecting a node", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();await h.monitor.testAllNodes();
+  const runControl = h.control.execute;
+  h.control.execute = async (action) => {
+    const result = await runControl(action);
+    if (action === "update") {
+      delete h.state.proxies["node-a"];
+      h.state.proxies["node-c"] = { type: "VLESS" };
+      for (const proxy of Object.values(h.state.proxies)) {
+        if (proxy.all) proxy.all = proxy.all.filter((node) => node !== "node-a").concat("node-c");
+        if (proxy.now === "node-a") proxy.now = "node-b";
+      }
+    }
+    return result;
+  };
+  const tested: string[] = [];
+  h.api.testDelay = async (node) => { tested.push(node!); return { ok: true, ms: node === "node-c" ? 222 : 111 }; };
+  await h.monitor.manageControl("update");
+  assert.equal(h.hostRefreshes(), 1);
+  assert.deepEqual(tested.sort(), ["node-b", "node-c", "♻️ 自动选择"].sort());
+  const tests = h.monitor.getDiagnostics().nodeTests as { results: Array<{ node: string }>; bestSelection?: string };
+  assert.deepEqual(Array.from(tests.results, ({ node }) => node).sort(), ["node-b", "node-c"]);
+  assert.equal(tests.bestSelection, undefined);
+  assert.equal(h.writes.length, 0);
+  assert.match((h.bar.tooltip as { value: string }).value, /222 ms/);
+  assert.doesNotMatch((h.bar.tooltip as { value: string }).value, /node\\-a/);
+});
+
+test("host-probe failure does not prevent full node tests or turn a successful update into a failed update", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  h.setHostRefresh(async () => { throw new Error("host probe failed"); });
+  await h.monitor.manageControl("update");
+  assert.equal(h.hostRefreshes(), 1);
+  assert.ok(h.notices.some((text) => text.includes("订阅已更新")));
+  assert.ok(h.warnings.some((text) => text.includes("部分刷新未完成")));
+  assert.equal(h.errors.length, 0);
+  assert.match((h.bar.tooltip as { value: string }).value, /2\/2.*完成/);
+  assert.equal(h.writes.length, 0);
+});
+
+test("failed or invalidated subscription updates do not launch host or all-node refreshes", async (t) => {
+  for (const invalidated of [false, true]) {
+    const h = await monitorHarness(t);
+    await h.monitor.refresh();
+    h.control.execute = async () => {
+      if (!invalidated) throw new Error("update failed");
+      h.config.enabled = false;h.monitor.reloadConfiguration();
+      return { running: true };
+    };
+    await h.monitor.manageControl("update");
+    assert.equal(h.hostRefreshes(), 0);
+    assert.equal(h.monitor.getDiagnostics().nodeTests, undefined);
+    assert.equal(h.writes.length, 0);
+  }
+});
+
+test("the update remains exclusive until both host and node refreshes complete", { timeout: 3000 }, async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  let release!: () => void;
+  h.setHostRefresh(() => new Promise<void>((resolve) => { release = resolve; }));
+  const pending = h.monitor.manageControl("update");
+  await h.firstNodeBatchCompleted;
+  assert.equal(h.hostRefreshes(), 1);
+  assert.match((h.bar.tooltip as { value: string }).value, /2\/2.*完成/);
+  await h.monitor.manageControl("update");
+  await h.monitor.chooseNode({ group: "🔰 节点选择", node: "node-b" });
+  assert.deepEqual(h.controlCalls, ["update"]);
+  assert.equal(h.writes.length, 0);
+  release();await pending;
+});
+
 test("runtime controls use the existing hover, keep start available while stopped, and update without adding or choosing a subscription", async (t) => {
   const h = await monitorHarness(t);
   await h.monitor.refresh();
@@ -367,6 +451,8 @@ test("runtime controls use the existing hover, keep start available while stoppe
   assert.equal(h.monitor.getDiagnostics().proxyStopped, true);
   await h.monitor.manageControl("update");
   assert.equal(h.bar.text, "$(globe) Clash 已关闭");
+  assert.equal(h.hostRefreshes(), 1);
+  assert.equal(h.monitor.getDiagnostics().nodeTests, undefined);
   assert.ok(h.notices.some((notice) => notice.includes("代理保持关闭")));
   await h.monitor.manageControl("start");
   assert.equal(h.bar.text, "$(globe) √ Google（3349 ms）");

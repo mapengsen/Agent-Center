@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.31 - 2026-10-22
+
+### Changed / 变更
+
+- Successful subscription updates immediately refresh the host Google probe, current-node/subscription state and all loaded node delays with five concurrent tests. Discard old batch results and cancel stale host requests without changing periodic schedules or automatically selecting nodes.
+- 更新订阅成功后立即刷新扩展宿主 Google 联网、当前节点/订阅状态和全部已加载节点延迟，最多 5 个并行；清除旧结果，取消旧联网请求后重测，不改变定时频率或自动切换节点。
+- Keep refreshes independent, retain the control-operation guard until refreshes finish and preserve a stopped proxy. Failed updates do not start a full refresh; later test errors do not roll back a successful subscription update.
+- 联网与节点检测独立执行，刷新期间保持操作互斥，关闭的代理保持关闭。更新失败不启动全量检测，后续检测失败不撤销已成功的订阅更新。
+
 ## 0.1.30 - 2026-10-22
 
 ### Added / 新增

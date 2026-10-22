@@ -36,7 +36,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
   private nodeTestAbort: AbortController | undefined;
   private nodeTestPending: Promise<void> | undefined;
 
-  public constructor() {
+  public constructor(private readonly refreshNetworkAfterUpdate: () => Promise<void> = async () => {}) {
     this.statusBar = vscode.window.createStatusBarItem("agentStatus.clash", vscode.StatusBarAlignment.Right, 70);
     this.statusBar.name = "Agent Center: Google connectivity and Clash latency";
     // Clicking focuses this status-bar entry; VS Code shows its existing hover.
@@ -143,12 +143,16 @@ export class ClashStatusMonitor implements vscode.Disposable {
     }
     if (this.disposed || !enabled() || !vscode.workspace.isTrusted || this.choosing) return Promise.resolve();
     this.choosing = true;
+    return this.startNodeTests(this.generation, selectBest, true);
+  }
+
+  private startNodeTests(generation: number, selectBest: boolean, releaseChoosing: boolean): Promise<void> {
     const controller = new AbortController();
     this.nodeTestAbort = controller;
-    this.nodeTestPending = this.runNodeTests(this.generation, controller, selectBest).finally(() => {
+    this.nodeTestPending = this.runNodeTests(generation, controller, selectBest).finally(() => {
       this.nodeTestPending = undefined;
       this.nodeTestAbort = undefined;
-      this.choosing = false;
+      if (releaseChoosing) this.choosing = false;
     });
     return this.nodeTestPending;
   }
@@ -252,6 +256,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
     this.choosing = true;
     const generation = this.generation;
     let attempted = false;
+    let updateSucceeded = false;
     try {
       await this.pending;
       if (!this.active(generation)) return;
@@ -267,6 +272,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
         () => control.execute(action, connection),
       );
       if (!this.active(generation)) return;
+      updateSucceeded = action === "update";
       this.proxyStopped = !result.running;
       this.lastError = "";
       this.snapshot = undefined;
@@ -280,13 +286,29 @@ export class ClashStatusMonitor implements vscode.Disposable {
         if (result.dns.web.status === "failed") void vscode.window.showWarningMessage(text);
         else void vscode.window.showInformationMessage(text);
       } else void vscode.window.showInformationMessage(action === "update"
-        ? "Clash 当前订阅已更新" + (result.running ? "并加载生效。" : "，代理保持关闭。")
+        ? "Clash 当前订阅已更新" + (result.running ? "并加载生效，正在刷新联网与全部节点测速。" : "，代理保持关闭，正在刷新联网状态。")
         : action === "start" ? "Clash 代理已开启。" : "Clash 代理已关闭。");
     } catch (error) {
       if (this.active(generation)) void vscode.window.showErrorMessage("Clash 操作失败：" + message(error));
     } finally {
-      this.choosing = false;
-      if (attempted && this.active(generation)) await this.refresh();
+      try {
+        if (attempted && this.active(generation)) {
+          if (updateSucceeded) {
+            const refreshed = await Promise.allSettled([
+              Promise.resolve().then(() => this.refreshNetworkAfterUpdate()),
+              (async () => {
+                await this.update("manual", generation);
+                if (this.active(generation) && this.snapshot && !this.proxyStopped && !this.noActiveSubscription) {
+                  await this.startNodeTests(generation, false, false);
+                }
+              })(),
+            ]);
+            if (this.active(generation) && refreshed.some((result) => result.status === "rejected")) {
+              void vscode.window.showWarningMessage("Clash 订阅已更新，但部分刷新未完成，请重新检测联网或测速。");
+            }
+          } else await this.update("automatic", generation);
+        }
+      } finally { this.choosing = false; }
     }
   }
 

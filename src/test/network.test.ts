@@ -129,6 +129,7 @@ test("invalid URLs and failed connections have safe diagnostics", async (t) => {
 
 async function monitorHarness(t: TestContext) {
   let presentation: NetworkStatusPresentation | undefined;
+  const presentations: Array<NetworkStatusPresentation | undefined> = [];
   const config: Record<string, unknown> = {};
   const timers = new Map<number, { callback: () => void; delay: number }>();
   let timerId = 0;
@@ -156,9 +157,9 @@ async function monitorHarness(t: TestContext) {
     clearTimeout: (id: number) => { timers.delete(id); },
     AbortController,
   }, { filename: entry });
-  const monitor = new module.exports.NetworkStatusMonitor((value) => { presentation = value; });
+  const monitor = new module.exports.NetworkStatusMonitor((value) => { presentation = value; presentations.push(value); });
   t.after(() => monitor.dispose());
-  return { monitor, config, fakeVscode, calls, timers, presentation: () => presentation,
+  return { monitor, config, fakeVscode, calls, timers, presentations, presentation: () => presentation,
     setProbe: (value: typeof probe) => { probe = value; } };
 }
 
@@ -206,6 +207,30 @@ test("starts immediately, schedules five-hour checks and coalesces manual refres
   assert.equal(h.presentation()?.icon, "✅️", "Keep the compact previous result during refresh");
   complete({ status: "available", detail: "网页可访问", elapsedMs: 1, httpStatus: 200 });
   await first;
+  assert.equal(h.calls.length, 3);
+});
+
+test("proxy-change refresh cancels stale requests, publishes a fresh result and preserves the five-hour timer", async (t) => {
+  const h = await monitorHarness(t);
+  h.monitor.start();await new Promise((resolve) => setImmediate(resolve));
+  const timer = [...h.timers.entries()][0];
+  let stale!: (value: NetworkProbeResult) => void;
+  h.setProbe(() => new Promise((resolve) => { stale = resolve; }));
+  const previous = h.monitor.refresh();
+  const oldSignal = h.calls.at(-1)!.signal;
+  h.setProbe(async () => ({ status: "available", detail: "已收到 HTTP 响应", elapsedMs: 20, httpStatus: 403 }));
+  const updated = h.monitor.refreshAfterProxyChange();
+  assert.equal(oldSignal?.aborted, true);
+  stale({ status: "error", detail: "已取消", elapsedMs: 1 });
+  await Promise.all([previous, updated]);
+  assert.equal(h.calls.length, 3);
+  assert.equal(h.presentation()?.icon, "✅️");
+  assert.match(h.presentation()!.tooltip, /HTTP 403/);
+  assert.ok(h.presentations.every((value) => !value?.tooltip.includes("已取消")));
+  assert.equal(h.timers.get(timer[0]), timer[1]);
+  assert.equal(h.timers.size, 1);
+  h.config["agentStatus.network.enabled"] = false;
+  await h.monitor.refreshAfterProxyChange();
   assert.equal(h.calls.length, 3);
 });
 
