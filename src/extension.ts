@@ -30,6 +30,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("agentStatus.startClash", () => clashStatus.manageControl("start")),
     vscode.commands.registerCommand("agentStatus.stopClash", () => clashStatus.manageControl("stop")),
     vscode.commands.registerCommand("agentStatus.updateClashSubscription", () => clashStatus.manageControl("update")),
+    vscode.commands.registerCommand("agentStatus.useSubscriptionDns", () => clashStatus.manageControl("subscription-dns")),
+    vscode.commands.registerCommand("agentStatus.restoreClashDns", () => clashStatus.manageControl("restore-dns")),
     vscode.commands.registerCommand("agentStatus.refreshNetwork", () => networkStatus.refresh("manual")),
     vscode.commands.registerCommand("agentStatus.chooseClashNode", (selection?: unknown) => clashStatus.chooseNode(selection)),
     vscode.commands.registerCommand("agentStatus.addClashSubscription", () => clashStatus.manageSubscriptions("add")),

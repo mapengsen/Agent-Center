@@ -48,6 +48,11 @@ export class ClashApiClient {
     await this.request("/configs?force=true", "PUT", { path: configPath }, 30000);
   }
 
+  public async flushDnsCache(): Promise<boolean> {
+    try { await this.request("/cache/dns/flush", "POST"); return true; }
+    catch { return false; } // Older Clash/Mihomo versions may not expose this API.
+  }
+
   public async testDelay(node: string, url: string, timeoutMs: number): Promise<DelayResult> {
     try {
       const query = new URLSearchParams({ url, timeout: String(timeoutMs) });

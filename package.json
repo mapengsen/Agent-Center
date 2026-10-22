@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex/Claude quotas, Codex provider switching with shared history, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -118,6 +118,14 @@
       {
         "command": "agentStatus.openSettings",
         "title": "Agent Center: Open Settings"
+      },
+      {
+        "command": "agentStatus.useSubscriptionDns",
+        "title": "Agent Center: Use Subscription DNS"
+      },
+      {
+        "command": "agentStatus.restoreClashDns",
+        "title": "Agent Center: Restore Clash DNS Overrides"
       }
     ],
     "configuration": {
@@ -338,7 +346,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },

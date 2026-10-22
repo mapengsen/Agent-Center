@@ -162,6 +162,10 @@ async function monitorHarness(t: TestContext) {
       controlCalls.push(action);
       if (action === "start") running = true;
       if (action === "stop") running = false;
+      if (action === "subscription-dns" || action === "restore-dns") return { running, dns: {
+        mode: action === "subscription-dns" ? "subscription" : "local", backupDirectory: "/test/dns-backup",
+        web: { status: "failed", detail: "Google 网页仍无法访问，请继续检查节点。" },
+      } };
       return { running };
     },
   };
@@ -232,7 +236,7 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.match(hover.value, /3349 ms/);
   assert.match(hover.value, /我的机场（default）/);
   assert.doesNotMatch(hover.value, /showClashDetails/);
-  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription"]) {
+  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription", "useSubscriptionDns", "restoreClashDns"]) {
     assert.ok(hover.value.includes("command:agentStatus." + command));
     assert.ok(hover.isTrusted.enabledCommands.includes("agentStatus." + command));
   }
@@ -266,6 +270,21 @@ test("runtime controls use the existing hover, keep start available while stoppe
   h.config.enabled = false;
   await h.monitor.manageControl("start");
   assert.equal(h.controlCalls.length, 3);
+});
+
+test("DNS actions use the existing hover and report failed webpage checks without claiming a network repair", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  await h.monitor.manageControl("subscription-dns");
+  assert.deepEqual(h.controlCalls, ["subscription-dns"]);
+  assert.ok(h.warnings.some((text) => text.includes("DNS 已使用订阅配置") && text.includes("仍无法访问")));
+  assert.ok((h.monitor.getDiagnostics().dnsVerification as { backupDirectory: string }).backupDirectory);
+  await h.monitor.manageControl("restore-dns");
+  assert.deepEqual(h.controlCalls, ["subscription-dns", "restore-dns"]);
+  assert.ok(h.warnings.some((text) => text.includes("原 DNS 覆写已恢复")));
+  h.fakeVscode.workspace.isTrusted = false;
+  await h.monitor.manageControl("subscription-dns");
+  assert.equal(h.controlCalls.length, 2);
 });
 
 test("status monitor renders latency and node hover, verifies switch, rejects stale links and honors trust", async (t) => {

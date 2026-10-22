@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.28 - 2026-10-22
+
+### Added / 新增
+
+- Add Use Subscription DNS and Restore Clash DNS Overrides to the existing native hover and command palette for Linux/WSL. Preserve host DNS enable/listen/IPv6 and unrelated settings, update and verify the source policy, isolate per-host mixins, create private backups and recover on configuration failures. Native updates continue using the cleaned Mixin; plugin start/update actions reapply and verify the opted-in policy.
+- Linux/WSL 的原生悬浮卡片和命令面板新增 DNS 使用订阅配置、恢复原 DNS 覆写。保留本机 DNS 启用、监听、IPv6 和其他设置，更新核验来源策略，隔离按主机 Mixin，私有备份并支持配置失败恢复；原生更新继续使用清理后的 Mixin，插件启动/更新会再次应用核验已启用的策略。
+- Report an independent full Google webpage download through the current local proxy, using curl without credentials; attempt supported DNS-cache flush after reload. Distinguish successful DNS application from webpage failure or skipped testing, preserving a stopped service.
+- 独立报告经当前本机代理下载 Google 完整网页的结果，使用 curl，不携带登录凭据；加载后尝试清理内核 DNS 缓存。明确区分 DNS 应用成功、网页访问失败和未检测，关闭的代理保持关闭。
+
 ## 0.1.27 - 2026-10-21
 
 ### Changed / 变更

@@ -21,6 +21,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
 | Start and stop the proxy | Use native Clash controls in the same hover, verify the controller starts or stops, retain subscriptions and keep the start action available while stopped. |
 | Update the current subscription | Download the saved active source again, force-load and verify the running configuration, preserve available manual choices and restore the previous state on failure. Updates while stopped keep the service stopped. |
+| Use subscription DNS | Remove conflicting local DNS resolution overrides, keep host DNS enable/listen/IPv6 settings, update the active source and verify the generated DNS policy. Preserve backups, support restoring original DNS overrides and check a complete Google webpage through the current local proxy. Linux/WSL only. |
 | Add, switch and delete subscriptions | Paste a URL to detect its name, save without switching or apply immediately, view the active subscription, and delete any subscription. Deleting the active source switches to the next enabled one; without a replacement, Clash stops. Requires compatible clash-for-linux. |
 | Recover Codex file links | Open supported absolute file links with `code -r`, including images, PDF, SVG, Markdown, CSV, TOML and Office files: **30 default formats**, with a configurable list. Recover failed opens and clean text tabs; preserve unsaved edits and prevent reopen loops. |
 | Remote use, settings and diagnostics | Run in the current local or remote extension host, configure feature switches, credentials and proxies, and inspect quota, connectivity, Clash and file-link diagnostics. |
@@ -156,6 +157,16 @@ Agent Center reads only new entries from the current window's existing `Codex.lo
 - **Agent Center: Restart Codex File Link Listener**: restart after troubleshooting, then click the link again.
 - `agentStatus.codexImageLinks.logFile`: advanced override for the absolute path to the current window and extension host's `Codex.log`. Leave empty for automatic detection. It selects a file to read, not a destination for new logs.
 
+## DNS from the subscription (Linux/WSL)
+
+Choose **DNS 使用订阅配置** in the existing bottom-right Clash hover, or run **Agent Center: Use Subscription DNS**. This is opt-in and applies to the detected clash-for-linux installation. It supports current runtime mixins, host-specific runtime directories and the legacy `resources/mixin.yaml` layout.
+
+The action backs up the active configuration, subscription state and Mixin under the current runtime's `.agent-center-backups/<timestamp>-dns-<id>/`, then removes local DNS resolution overrides such as nameservers, split-DNS policy, fallback and fake-IP settings. Host DNS `enable`, `listen` and `ipv6` remain local; proxy ports, controller credentials, TUN, nodes and rules are retained. Shared fallback mixins are copied into the host runtime rather than edited globally. The current source is updated and its DNS policy is compared with the generated configuration before a running core is force-reloaded. A subscription without a meaningful DNS policy or an unsupported source layout fails with recovery rather than silently clearing local DNS.
+
+The Mixin change persists through native subscription updates and switches. While the policy marker is active, Agent Center start/update actions also remove accidentally reintroduced DNS overrides and verify the result. Reinstallation, manually restoring files or changing the build pipeline may require applying the action again. **恢复原 DNS 覆写** / **Agent Center: Restore Clash DNS Overrides** restores the original DNS resolution overrides while retaining later edits to unrelated settings and host DNS infrastructure. Download, build, verification or reload failures attempt to restore the original files, node selections and on/off state; a stopped proxy stays stopped. Backups contain configuration secrets and use private directory/file permissions.
+
+After a running core reloads, Agent Center attempts to flush its DNS cache where supported and uses `curl` through the local HTTP or SOCKS proxy to download Google's public webpage (15-second limit, successful HTTP status and nonempty body required). A failed webpage check is reported separately: the verified DNS policy remains applied, and other node/routing problems may still need diagnosis. This result does not redefine the existing green latency or Google host-connectivity icon. With no curl, no local proxy port, proxy authentication or a stopped proxy, the check is explicitly marked skipped. No ChatGPT login or API key is used. DNS backups and the latest webpage result appear in diagnostics.
+
 ## Commands
 
 Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Agent Center**. Every contributed command is listed here:
@@ -172,6 +183,8 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 | Agent Center: Start Clash Proxy | Start the current environment's native proxy and verify its loaded configuration. |
 | Agent Center: Stop Clash Proxy | Stop the proxy, verify the controller stops and retain subscriptions. |
 | Agent Center: Update Current Clash Subscription | Refresh the saved active source, preserve its on/off state and recover on failure. |
+| Agent Center: Use Subscription DNS | Persist subscription DNS priority, update/verify the active source and report a webpage check through Clash. |
+| Agent Center: Restore Clash DNS Overrides | Restore backed-up DNS overrides while retaining later unrelated edits and the proxy's on/off state. |
 | Agent Center: Choose Clash Node | Search for and switch a node in a manual selector group. |
 | Agent Center: Add Clash Subscription | Paste a URL, detect its name, then save or switch. |
 | Agent Center: Choose Clash Subscription | Select and apply a saved subscription. |
@@ -204,6 +217,10 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.28 - 2026-10-22
+
+- Add opt-in subscription DNS priority and DNS-only restore to the native Clash hover, with private backups, generated-policy verification, failure recovery and an independent full-webpage proxy test.
 
 ### 0.1.27 - 2026-10-21
 

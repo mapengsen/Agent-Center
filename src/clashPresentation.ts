@@ -8,12 +8,16 @@ export interface ClashSnapshot {
   delay: DelayResult;
   updatedAt: Date;
   subscription?: string;
+  subscriptionDns?: boolean;
+  dnsWebVerification?: string;
 }
 
 export function clashControlLinks(): string {
   return commandLink("开启代理", "agentStatus.startClash") + " · " +
     commandLink("关闭代理", "agentStatus.stopClash") + " · " +
-    commandLink("更新当前订阅", "agentStatus.updateClashSubscription");
+    commandLink("更新当前订阅", "agentStatus.updateClashSubscription") + "\n\n" +
+    commandLink("DNS 使用订阅配置", "agentStatus.useSubscriptionDns") + " · " +
+    commandLink("恢复原 DNS 覆写", "agentStatus.restoreClashDns");
 }
 
 export function formatClashDelay(result: DelayResult): string {
@@ -32,6 +36,8 @@ export function clashTooltip(snapshot: ClashSnapshot): string {
   ];
   if (!delay.ok) lines.push("失败原因：" + escapeMarkdown(delay.error));
   if (snapshot.subscription) lines.push("**当前订阅**：" + escapeMarkdown(snapshot.subscription));
+  if (snapshot.subscriptionDns) lines.push("**DNS 策略**：使用订阅配置（保留本机监听、启用和 IPv6 设置）。");
+  if (snapshot.dnsWebVerification) lines.push("**最近网页验证**：" + escapeMarkdown(snapshot.dnsWebVerification));
   lines.push(clashControlLinks());
   if (state.mode === "rule") lines.push("显示所选策略组的节点；其他规则可能使用其他策略组。");
   const proxy = state.proxies[group];

@@ -1,10 +1,13 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { ClashApiClient, findActiveGroup, resolveProxyChain } from "./clashApi";
 import { CLASH_TEST_URL, loadClashConnection, type ClashSettings } from "./clashConfig";
 import { clashTooltip, clashControlLinks, commandLink, escapeMarkdown, formatClashDelay, type ClashSnapshot } from "./clashPresentation";
 import { discoverClashSubscriptions, validateSubscriptionUrl } from "./clashSubscriptions";
 import { discoverClashControl, type ClashControlAction } from "./clashControl";
 import { controllerListening } from "./clashRuntime";
+import { subscriptionDnsEnabled } from "./clashDns";
+import type { ClashWebProbe } from "./clashWebProbe";
 import type { NetworkStatusPresentation } from "./networkStatus";
 
 interface NodeSelection { group: string; node: string }
@@ -26,6 +29,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
   private controller = "";
   private networkStatus: NetworkStatusPresentation | undefined;
   private clashView: { text: string; tooltip: string; warning: boolean } | undefined;
+  private dnsVerification: { checkedAt: string; result: ClashWebProbe; backupDirectory: string } | undefined;
 
   public constructor() {
     this.statusBar = vscode.window.createStatusBarItem("agentStatus.clash", vscode.StatusBarAlignment.Right, 70);
@@ -95,7 +99,10 @@ export class ClashStatusMonitor implements vscode.Disposable {
       this.configPath = connection.configPath;
       this.lastError = "";
       this.proxyStopped = false;
-      this.snapshot = { state, group, chain, delay, subscription, updatedAt: new Date() };
+      const subscriptionDns = connection.configPath ? await subscriptionDnsEnabled(path.dirname(connection.configPath)) : false;
+      if (!this.active(generation)) return;
+      this.snapshot = { state, group, chain, delay, subscription, updatedAt: new Date(), subscriptionDns,
+        dnsWebVerification: this.dnsVerification ? this.dnsVerification.result.detail + "（" + this.dnsVerification.checkedAt + "）" : undefined };
       this.renderSnapshot();
     } catch (error) {
       if (!this.active(generation)) return;
@@ -134,7 +141,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
       const connection = await loadClashConnection({ ...settings, configPath: settings.configPath || this.configPath });
       const control = await discoverClashControl(connection.configPath, settings.installDirectory);
       if (!this.active(generation)) return;
-      const title = action === "start" ? "开启代理" : action === "stop" ? "关闭代理" : "更新当前订阅";
+      const title = { start: "开启代理", stop: "关闭代理", update: "更新当前订阅", "subscription-dns": "让 DNS 使用订阅配置", "restore-dns": "恢复原 DNS 覆写" }[action];
       attempted = true;
       const result = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Clash：正在" + title + "…" },
@@ -148,7 +155,12 @@ export class ClashStatusMonitor implements vscode.Disposable {
       this.configPath = control.configPath;
       this.controller = connection.controller;
       if (!result.running) this.renderStopped();
-      void vscode.window.showInformationMessage(action === "update"
+      if (result.dns) {
+        this.dnsVerification = { checkedAt: new Date().toLocaleString(), result: result.dns.web, backupDirectory: result.dns.backupDirectory };
+        const text = (result.dns.mode === "subscription" ? "DNS 已使用订阅配置并核验。" : "原 DNS 覆写已恢复。") + result.dns.web.detail + " 备份：" + result.dns.backupDirectory;
+        if (result.dns.web.status === "failed") void vscode.window.showWarningMessage(text);
+        else void vscode.window.showInformationMessage(text);
+      } else void vscode.window.showInformationMessage(action === "update"
         ? "Clash 当前订阅已更新" + (result.running ? "并加载生效。" : "，代理保持关闭。")
         : action === "start" ? "Clash 代理已开启。" : "Clash 代理已关闭。");
     } catch (error) {
@@ -342,6 +354,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
       enabled: enabled(), trusted: vscode.workspace.isTrusted,
       extensionHost: vscode.env.remoteName ?? "local",
       controller: this.controller, configPath: this.configPath,
+      dnsVerification: this.dnsVerification,
       group: this.snapshot?.group, mode: this.snapshot?.state.mode,
       chain: this.snapshot?.chain, delay: this.snapshot?.delay,
       subscription: this.snapshot?.subscription,
@@ -418,7 +431,7 @@ function trustedMarkdown(value: string): vscode.MarkdownString {
   const result = new vscode.MarkdownString(value);
   result.isTrusted = { enabledCommands: ["agentStatus.chooseClashNode", "agentStatus.refreshClash", "agentStatus.refreshNetwork", "agentStatus.openSettings",
     "agentStatus.chooseClashSubscription", "agentStatus.addClashSubscription", "agentStatus.removeClashSubscription",
-    "agentStatus.startClash", "agentStatus.stopClash", "agentStatus.updateClashSubscription"] };
+    "agentStatus.startClash", "agentStatus.stopClash", "agentStatus.updateClashSubscription", "agentStatus.useSubscriptionDns", "agentStatus.restoreClashDns"] };
   return result;
 }
 

@@ -21,6 +21,7 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
 | 开启与关闭代理 | 在同一悬浮卡片调用原生 Clash 开关，核验控制器启动或停止；关闭后仍保留开启入口，订阅不会被删除。 |
 | 更新当前订阅 | 重新下载当前订阅并校验、强制加载到运行中的 Clash，保留仍可用的手动节点选择；失败恢复原配置。关闭时更新后仍保持关闭。 |
+| DNS 使用订阅配置 | 移除本地 DNS 解析策略覆写，保留本机 DNS 启用、监听和 IPv6 设置，更新当前订阅并核验最终 DNS。提供备份和恢复原覆写，通过当前代理下载 Google 完整网页并单独报告结果。支持 Linux/WSL。 |
 | 添加、切换、删除订阅 | 直接粘贴链接自动识别名称，可仅保存或立即切换，显示当前订阅，并可删除任意订阅。删除活动订阅时自动切换到下一个已启用订阅；无可用替代时停止 Clash。需要兼容的 clash-for-linux。 |
 | Codex 文件链接补开 | 通过 `code -r` 补开支持的绝对路径链接，默认 **30 种格式**，包含图片、PDF、SVG、Markdown、CSV、TOML 和 Office，可自定义列表；覆盖打开失败与未修改文本标签页，保留未保存修改并防止重复重开。 |
 | 远程环境、设置与诊断 | 在当前本地或远程扩展宿主运行，支持功能开关、凭据与代理配置，并查看额度、联网、Clash 和文件补开的诊断结果。 |
@@ -158,6 +159,16 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 - **Agent Center: Restart Codex File Link Listener**：排查问题后重启监听，然后重新点击文件链接。
 - `agentStatus.codexImageLinks.logFile`：高级设置，手动指定当前窗口、当前扩展宿主中的 `Codex.log` 绝对路径；留空自动定位。它指定读取来源，不会在该路径创建新日志。
 
+## DNS 使用订阅配置（Linux/WSL）
+
+在右下角原有 Clash 悬浮卡片点击 **DNS 使用订阅配置**，或运行 **Agent Center: Use Subscription DNS**。功能需要手动启用，只处理检测到的 clash-for-linux 安装；兼容新版运行目录、按主机隔离目录和旧版 `resources/mixin.yaml`。
+
+操作前将当前配置、订阅状态和 Mixin 备份到当前运行目录的 `.agent-center-backups/<时间>-dns-<编号>/`，再移除本地解析服务器、DNS 分流、fallback、fake-IP 等解析策略覆写。DNS 的 `enable`、`listen`、`ipv6` 保留本机设置，代理端口、控制器凭据、TUN、节点和规则保留。共享的 Mixin 回退文件会复制到当前主机的运行目录处理，不直接修改共享文件。随后更新当前订阅，对比订阅来源与最终运行配置的 DNS 策略，再强制加载到运行内核；订阅未提供有效 DNS 策略或来源目录不兼容时，失败恢复，避免静默清空本地 DNS。
+
+修改后的 Mixin 会在原生订阅更新、切换时继续生效。启用记录存在时，插件的启动/更新操作还会清除重新出现的解析覆写并核验结果。重装、手动恢复文件或更换配置生成流程后，可能需要重新应用。**恢复原 DNS 覆写** / **Agent Center: Restore Clash DNS Overrides** 只恢复备份中的解析策略，保留后续对其他设置及本机 DNS 监听、开关和 IPv6 的修改。下载、生成、核验或加载失败时，尝试恢复原文件、节点和开关状态；原来关闭的代理保持关闭。备份包含配置密钥，使用私有目录和文件权限。
+
+运行中的内核重新加载后，插件会尝试清理其 DNS 缓存（接口支持时），再使用 `curl` 经过本机 HTTP 或 SOCKS 代理下载 Google 公开网页，限时 15 秒，要求成功状态码且下载内容非空。网页检查失败会单独报告：已经核验的 DNS 策略仍保留，节点和路由等其他问题仍需排查。这个结果不会改变现有绿色测速或扩展宿主联网图标的含义。缺少 curl、没有本机代理端口、代理需要认证或代理已关闭时，会明确标记未检测。不会使用 ChatGPT 登录或 API Key。诊断结果包含备份位置和最近网页检查结果。
+
 ## 全部命令
 
 按 `Ctrl+Shift+P` / `Cmd+Shift+P` 打开命令面板，搜索 **Agent Center**。插件提供的全部命令如下：
@@ -174,6 +185,8 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 | Agent Center: Start Clash Proxy | 开启当前环境的 Clash 代理并核验配置加载。 |
 | Agent Center: Stop Clash Proxy | 关闭 Clash 代理并确认控制器停止，保留订阅。 |
 | Agent Center: Update Current Clash Subscription | 重新下载并更新当前订阅，保留原开关状态，失败恢复。 |
+| Agent Center: Use Subscription DNS | 持久应用订阅 DNS 优先，更新并核验当前订阅，报告经 Clash 的网页访问检查。 |
+| Agent Center: Restore Clash DNS Overrides | 恢复备份中的 DNS 覆写，保留后续其他修改和代理开关状态。 |
 | Agent Center: Choose Clash Node | 搜索并切换手动策略组中的节点。 |
 | Agent Center: Add Clash Subscription | 粘贴链接识别名称，再选择保存或立即切换。 |
 | Agent Center: Choose Clash Subscription | 选择并应用已保存订阅。 |
@@ -206,6 +219,10 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.28 - 2026-10-22
+
+- 原生 Clash 悬浮卡片新增手动启用“DNS 使用订阅配置”和恢复原 DNS 覆写，提供私有备份、生成策略核验、失败恢复，以及独立的完整网页代理测试。
 
 ### 0.1.27 - 2026-10-21
 
