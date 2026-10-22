@@ -1,5 +1,6 @@
 import type { ClashState, DelayResult } from "./clashApi";
 import { resolveProxyChain } from "./clashApi";
+import { sortedNodeDelays, type ClashNodeTests } from "./clashNodeTests";
 
 export interface ClashSnapshot {
   state: ClashState;
@@ -10,6 +11,7 @@ export interface ClashSnapshot {
   subscription?: string;
   subscriptionDns?: boolean;
   dnsWebVerification?: string;
+  nodeTests?: ClashNodeTests;
 }
 
 export function clashControlLinks(): string {
@@ -47,20 +49,40 @@ export function clashTooltip(snapshot: ClashSnapshot): string {
       const target = resolveProxyChain(state.proxies, node).at(-1);
       lines.push((node === proxy.now ? "✓ " : "• ") +
         commandLink(node, "agentStatus.chooseClashNode", [{ group, node }]) +
-        (target && target !== node ? " → " + escapeMarkdown(target) : ""));
+        (target && target !== node ? " → " + escapeMarkdown(target) : "") +
+        nodeDelayText(snapshot.nodeTests, node));
     }
     if (proxy.all.length > 12) lines.push("其余节点请点击下方“全部节点”。");
   } else if (state.mode === "direct") {
     lines.push("当前为直连模式；切换为规则或全局模式后可选择代理节点。");
   }
   lines.push(commandLink("全部节点", "agentStatus.chooseClashNode") + " · " +
+    commandLink("全部节点测速", "agentStatus.testAllClashNodes") + " · " +
     commandLink("刷新测速", "agentStatus.refreshClash") + " · " +
     commandLink("设置", "agentStatus.openSettings"));
   lines.push(commandLink("切换订阅", "agentStatus.chooseClashSubscription") + " · " +
     commandLink("添加订阅", "agentStatus.addClashSubscription") + " · " +
     commandLink("删除订阅", "agentStatus.removeClashSubscription"));
-  lines.push("更新于 " + snapshot.updatedAt.toISOString());
+  if (snapshot.nodeTests) {
+    const tests = snapshot.nodeTests;
+    lines.push("**全部节点测速**：" + tests.results.length + "/" + tests.total +
+      (tests.running ? "（测速中，最多 5 个并行） · " + commandLink("取消测速", "agentStatus.cancelClashNodeTests")
+        : tests.cancelled ? "（已取消，保留已完成结果）" : "（完成，按延迟排序）"));
+    lines.push("本轮测速：" + (tests.finishedAt ?? tests.startedAt).toISOString());
+    const rows = sortedNodeDelays(tests.results).map(({ node, delay }) => {
+      const label = proxy?.type === "Selector" && proxy.all?.includes(node)
+        ? commandLink(node, "agentStatus.chooseClashNode", [{ group, node }]) : escapeMarkdown(node);
+      return "| " + label + " | " + formatClashDelay(delay) + " |";
+    });
+    if (rows.length) lines.push(["| 节点 | Google 延迟 |", "| --- | --- |", ...rows].join("\n"));
+  }
+  lines.push("当前节点更新于 " + snapshot.updatedAt.toISOString());
   return lines.join("\n\n");
+}
+
+export function nodeDelayText(tests: ClashNodeTests | undefined, node: string): string {
+  const result = tests?.results.find((item) => item.node === node);
+  return result ? " · " + formatClashDelay(result.delay) : "";
 }
 
 export function commandLink(label: string, command: string, args?: unknown[]): string {

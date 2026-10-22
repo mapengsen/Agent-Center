@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.29 - 2026-10-22
+
+### Added / 新增
+
+- Test all concrete nodes loaded by Clash/Mihomo with five concurrent Google delay requests, excluding groups and built-in Direct/Reject types. Add manual test/cancel actions to the existing hover and command palette; show timestamped sorted results and latency in the node picker. No selection writes; existing five-minute automatic current-node tests remain unchanged.
+- 新增全部节点并行测速，最多同时进行 5 个 Google 延迟请求，排除策略组和 DIRECT/REJECT 等内置类型。原悬浮卡片和命令面板提供测速/取消入口，按延迟显示带时间的结果，节点选择列表显示本轮延迟。不切换当前节点，原有每 5 分钟当前节点自动测速保持不变。
+- Abort pending requests and stop queueing on cancellation, disabling or disposal; deduplicate repeated starts and discard results after configuration/subscription changes or changed node lists.
+- 支持取消、禁用或退出时终止等待请求与排队，重复点击复用同一轮任务，配置/订阅变更或节点列表变化后清除旧结果。
+
 ## 0.1.28 - 2026-10-22
 
 ### Added / 新增

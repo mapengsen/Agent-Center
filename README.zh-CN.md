@@ -19,6 +19,7 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | VS Code 联网检测 | 从扩展宿主只访问 Google 公开网页；收到任意 HTTP 响应显示 `✅️`，无响应显示 `❌`。图标放在 Clash 地球图标前，启动时检测一次，之后默认每 **5 小时**一次，也可手动检测。 |
 | Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
+| 全部节点并行测速 | 手动一键测试当前 Clash 已加载的全部实际节点，最多 5 个并行；原悬浮卡片按延迟展示结果，支持取消，不切换当前节点。 |
 | 开启与关闭代理 | 在同一悬浮卡片调用原生 Clash 开关，核验控制器启动或停止；关闭后仍保留开启入口，订阅不会被删除。 |
 | 更新当前订阅 | 重新下载当前订阅并校验、强制加载到运行中的 Clash，保留仍可用的手动节点选择；失败恢复原配置。关闭时更新后仍保持关闭。 |
 | DNS 使用订阅配置 | 移除本地 DNS 解析策略覆写，保留本机 DNS 启用、监听和 IPv6 设置，更新当前订阅并核验最终 DNS。提供备份和恢复原覆写，通过当前代理下载 Google 完整网页并单独报告结果。支持 Linux/WSL。 |
@@ -91,6 +92,12 @@ Codex 默认读取 `CODEX_HOME/auth.json` 或 `~/.codex/auth.json`，Claude 默�
 - 点击状态栏立即展开右下角状态项上方的原生悬浮卡片，与鼠标悬停时显示相同的节点、测速、订阅和操作入口。点击卡片中的节点可切换，点击“全部节点”可搜索完整列表。切换后校验结果并自动重新测速。
 - 使用与 clashtest 一致的 Google 测试地址 https://www.gstatic.com/generate_204，默认超时 8 秒。显示的是连接延迟（ms），不是下载带宽。
 - 默认每 5 分钟（300 秒）自动刷新并测速；手动刷新及切换节点或订阅后立即测速。未发现 Clash 时仅显示已启用的独立联网图标；控制器故障显示“Clash 未连接”，可在悬停中重试。
+
+### 全部节点并行测速
+
+在原来的右下角悬浮卡片点击 **全部节点测速**，或运行 **Agent Center: Test All Clash Nodes**。使用与当前节点测速相同的 Google 地址和超时，调用每个节点的延迟接口，最多同时测试 **5 个**，其余排队；包括当前 Clash 已加载的 proxy-provider 节点，跳过策略组、DIRECT、REJECT 等内置类型。不会下载或轮换其他已保存的订阅，不会发送节点切换命令。自动策略组仍按内核自身策略运行。
+
+结果在同一个悬浮卡片中逐项更新，显示 **√ Google（3349 ms）** 或 **× 超时**，完成后按成功节点延迟排序，失败项排在后面；完整节点选择列表也显示本轮已测延迟。可从进度通知、悬浮卡片的 **取消测速** 或 **Agent Center: Cancel Clash Node Tests** 取消，停止等待请求和后续排队，保留已完成结果。结果只保存在内存并标注本轮时间；更新配置、切换订阅或节点列表变化后清除。原来每 5 分钟的自动任务仍只测当前选择，不会自动进行全量测速。延迟不代表下载带宽或所有网站均可访问。
 
 通常将 configPath、installDirectory、controller 和 secret 留空即可。存在多个 Clash 实例、进程信息不可读或控制器位于另一环境时，可在**远程设置**用 agentStatus.clash.configPath 明确选择配置；已有手动设置优先于自动发现。仅填写 installDirectory 时，优先尝试其 `runtime/hosts/<当前主机名>/config.yaml`，再读取 `runtime/config.yaml`。group 留空时根据配置顺序选择手动策略组，全局模式读取 GLOBAL，直连模式读取 DIRECT。多个策略组时可指定 group。testTimeoutMs 和 updateIntervalSeconds 控制测速时限和刷新频率，enabled 可关闭此功能。
 
@@ -182,6 +189,8 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 | Agent Center: Choose Claude Usage Display | 选择 Claude 显示剩余或已使用百分比。 |
 | Agent Center: Test Google Website Connectivity | 立即运行扩展宿主的 Google 联网检测。 |
 | Agent Center: Refresh Clash Node Speed | 刷新 Clash 状态并检测当前选择节点的 Google 延迟。 |
+| Agent Center: Test All Clash Nodes | 手动并行测试当前已加载全部实际节点，在原悬浮卡片显示结果。 |
+| Agent Center: Cancel Clash Node Tests | 取消本轮全部节点测速，保留已完成结果。 |
 | Agent Center: Start Clash Proxy | 开启当前环境的 Clash 代理并核验配置加载。 |
 | Agent Center: Stop Clash Proxy | 关闭 Clash 代理并确认控制器停止，保留订阅。 |
 | Agent Center: Update Current Clash Subscription | 重新下载并更新当前订阅，保留原开关状态，失败恢复。 |
@@ -219,6 +228,10 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.29 - 2026-10-22
+
+- 新增全部节点并行测速与取消，最多 5 个并行，原悬浮卡片显示每个节点的 Google 延迟和超时结果，不切换当前节点。
 
 ### 0.1.28 - 2026-10-22
 

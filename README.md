@@ -19,6 +19,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | VS Code internet connectivity | Request only Google's public website from the extension host. Any HTTP response shows `✅️`; no response shows `❌`. The single icon sits before the Clash globe. Checks run at startup and every **5 hours**, with manual checks available. |
 | Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
+| Test all Clash nodes in parallel | Manually test all concrete nodes loaded by the current Clash core, up to five at a time. Show sorted results in the existing hover, support cancellation and send no node-selection commands. |
 | Start and stop the proxy | Use native Clash controls in the same hover, verify the controller starts or stops, retain subscriptions and keep the start action available while stopped. |
 | Update the current subscription | Download the saved active source again, force-load and verify the running configuration, preserve available manual choices and restore the previous state on failure. Updates while stopped keep the service stopped. |
 | Use subscription DNS | Remove conflicting local DNS resolution overrides, keep host DNS enable/listen/IPv6 settings, update the active source and verify the generated DNS policy. Preserve backups, support restoring original DNS overrides and check a complete Google webpage through the current local proxy. Linux/WSL only. |
@@ -91,6 +92,12 @@ Install Agent Center in your Remote SSH environment and reload the window. On Li
 - Click the status bar to immediately open the same hover card above the bottom-right status item, with current-node, latency and subscription information. Click a node to switch, or “全部节点” for the searchable full list. The selection is verified and latency refreshed afterward.
 - Tests use the same Google endpoint as clashtest, https://www.gstatic.com/generate_204, with an 8-second default timeout. This measures latency in milliseconds, rather than download bandwidth.
 - Refreshes and tests latency automatically every 5 minutes (300 seconds) by default. Manual refreshes and node or subscription switches test immediately. Without a discovered Clash service, only the independent connectivity icon is shown when enabled; controller failures provide retry actions.
+
+### Test all nodes in parallel
+
+Click **全部节点测速** in the existing bottom-right hover, or run **Agent Center: Test All Clash Nodes**. Each node uses the same Google endpoint and timeout as the current-node test, through its own delay API request. Up to **five** requests run concurrently, with remaining nodes queued. This includes proxy-provider nodes loaded by the current core, excluding policy groups and built-in Direct/Reject types. It does not download or rotate other saved subscriptions or send node-selection commands; automatic groups keep following the core's own policy.
+
+The same hover updates each result as **√ Google（3349 ms）** or **× 超时**, sorts successful nodes by latency and puts failures last. The full node picker also displays results from this batch. Cancel from the progress notification, **取消测速** in the hover, or **Agent Center: Cancel Clash Node Tests** to abort waiting requests and stop the queue, retaining completed results. Results are timestamped and kept in memory; configuration updates, subscription switches and changes to the node list clear them. The five-minute automatic task still tests only the current selection. These are latency tests, not download bandwidth or a guarantee that every website works.
 
 Usually leave configPath, installDirectory, controller and secret empty. For multiple instances, restricted process access or a controller in another environment, set **agentStatus.clash.configPath** in Remote Settings. Explicit configuration takes priority; specifying only installDirectory checks its `runtime/hosts/<current-hostname>/config.yaml` before `runtime/config.yaml`. Leave group empty to choose a manual group in configuration order; global mode uses GLOBAL and direct mode uses DIRECT. Set group explicitly when you want a particular rule-mode group. testTimeoutMs, updateIntervalSeconds and enabled control timeout, refresh interval and visibility.
 
@@ -180,6 +187,8 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 | Agent Center: Choose Claude Usage Display | Choose remaining or used percentage for Claude. |
 | Agent Center: Test Google Website Connectivity | Run the extension-host Google check immediately. |
 | Agent Center: Refresh Clash Node Speed | Read Clash state and test the selected node's Google latency. |
+| Agent Center: Test All Clash Nodes | Manually test all loaded concrete nodes in parallel and show results in the existing hover. |
+| Agent Center: Cancel Clash Node Tests | Cancel the current all-node batch, retaining completed results. |
 | Agent Center: Start Clash Proxy | Start the current environment's native proxy and verify its loaded configuration. |
 | Agent Center: Stop Clash Proxy | Stop the proxy, verify the controller stops and retain subscriptions. |
 | Agent Center: Update Current Clash Subscription | Refresh the saved active source, preserve its on/off state and recover on failure. |
@@ -217,6 +226,10 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.29 - 2026-10-22
+
+- Add cancellable parallel testing of all loaded proxy nodes, up to five at a time, with per-node Google delays and failures in the existing hover and no node-selection writes.
 
 ### 0.1.28 - 2026-10-22
 

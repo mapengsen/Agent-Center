@@ -154,6 +154,7 @@ async function monitorHarness(t: TestContext) {
   const notices: string[] = [];
   const warnings: string[] = [];
   const commands: string[] = [];
+  const progressCancellations = new Set<() => void>();
   const subscriptionCalls: Array<{ action: string; name: string }> = [];
   const controlCalls: string[] = [];
   const control = {
@@ -182,7 +183,7 @@ async function monitorHarness(t: TestContext) {
   const api = {
     getState: async () => { if (!running) throw new Error("ECONNREFUSED"); return structuredClone(state); },
     getProxies: async () => structuredClone(state.proxies),
-    testDelay: async () => timeout ? { ok: false, error: "test timeout" } : { ok: true, ms: 3349 },
+    testDelay: async (_node?: string, _url?: string, _timeout?: number, _signal?: AbortSignal) => timeout ? { ok: false, error: "test timeout" } : { ok: true, ms: 3349 },
     select: async (group: string, node: string) => { writes.push({ group, node }); state.proxies[group].now = node; },
   };
   const fakeVscode = {
@@ -201,7 +202,10 @@ async function monitorHarness(t: TestContext) {
       showQuickPick: async (items: Array<{ label: string; value: string; detail?: string }>) => { shownPicks.push(items); return picks.shift(); },
       showInputBox: async (options: { password?: boolean; prompt?: string }) => { shownInputs.push(options); return inputs.shift(); },
       showWarningMessage: async (text: string) => { warnings.push(text); return "删除订阅"; },
-      withProgress: async (_options: unknown, task: () => Promise<unknown>) => task(),
+      withProgress: async (_options: unknown, task: (progress: unknown, token: unknown) => Promise<unknown>) => task({ report: () => {} }, {
+        isCancellationRequested: false,
+        onCancellationRequested: (listener: () => void) => { progressCancellations.add(listener); return { dispose: () => progressCancellations.delete(listener) }; },
+      }),
       showInformationMessage: async (text: string) => { notices.push(text); }, showErrorMessage: async () => undefined,
     },
   };
@@ -218,12 +222,13 @@ async function monitorHarness(t: TestContext) {
         ...realRequire("./clashSubscriptions"), discoverClashSubscriptions: async () => subscriptions,
       } : name === "./clashControl" ? { discoverClashControl: async () => control }
         : name === "./clashRuntime" ? { ...realRequire(name), controllerListening: async () => running } : realRequire(name),
-    setTimeout, clearTimeout,
+    setTimeout, clearTimeout, AbortController,
   }, { filename: entry });
   const monitor = new module.exports.ClashStatusMonitor();
   t.after(() => monitor.dispose());
   return { monitor, state, writes, bar, fakeVscode, config, api, inputs, picks, shownInputs, shownPicks, subscriptions, subscriptionCalls,
-    notices, warnings, commands, control, controlCalls, shown: () => shown, failDelay: () => { timeout = true; } };
+    notices, warnings, commands, control, controlCalls, cancelProgress: () => progressCancellations.forEach((listener) => listener()),
+    shown: () => shown, failDelay: () => { timeout = true; } };
 }
 
 test("status-bar click opens the existing native hover with trusted actions and no editor page", async (t) => {
@@ -236,7 +241,8 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.match(hover.value, /3349 ms/);
   assert.match(hover.value, /我的机场（default）/);
   assert.doesNotMatch(hover.value, /showClashDetails/);
-  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription", "useSubscriptionDns", "restoreClashDns"]) {
+  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription", "useSubscriptionDns", "restoreClashDns", "testAllClashNodes", "cancelClashNodeTests"]) {
+    if (command === "cancelClashNodeTests") { assert.ok(hover.isTrusted.enabledCommands.includes("agentStatus." + command)); continue; }
     assert.ok(hover.value.includes("command:agentStatus." + command));
     assert.ok(hover.isTrusted.enabledCommands.includes("agentStatus." + command));
   }
@@ -245,6 +251,69 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.equal(h.shownPicks.length, 0);
   assert.deepEqual(h.notices, []);
   assert.deepEqual(h.commands, []);
+});
+
+test("all-node testing uses the hover, labels each result and preserves the current selection", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  const calls: string[] = [];
+  h.api.testDelay = async (node) => { calls.push(node!); return node === "node-b" ? { ok: false, error: "timeout" } : { ok: true, ms: 100 }; };
+  await h.monitor.testAllNodes();
+  assert.deepEqual(calls.sort(), ["node-a", "node-b"]);
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.state.proxies["🔰 节点选择"].now, "♻️ 自动选择");
+  const hover = (h.bar.tooltip as { value: string }).value;
+  assert.match(hover, /2\/2.*完成/);
+  assert.match(hover, /100 ms/);
+  assert.match(hover, /× 超时/);
+  assert.ok(h.notices.some((text) => /1 个可用，1 个超时/.test(text)));
+  h.picks.push({ label: "node-a", value: "node-a" });
+  await h.monitor.chooseNode();
+  assert.ok(h.shownPicks[0].some((item) => item.value === "node-a" && item.description?.includes("100 ms")));
+  await h.monitor.manageControl("update");
+  assert.doesNotMatch((h.bar.tooltip as { value: string }).value, /\*\*全部节点测速\*\*/);
+});
+
+test("duplicate all-node requests share one batch and progress cancellation stops the batch", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  let started = 0;
+  h.api.testDelay = async (_node, _url, _timeout, signal) => {
+    started++;
+    await new Promise<void>((resolve) => signal!.addEventListener("abort", () => resolve(), { once: true }));
+    return { ok: false, error: "cancelled" };
+  };
+  const first = h.monitor.testAllNodes();
+  assert.equal(first, h.monitor.testAllNodes());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(started, 2);
+  assert.match((h.bar.tooltip as { value: string }).value, /command:agentStatus.cancelClashNodeTests/);
+  h.cancelProgress();
+  await first;
+  assert.match((h.bar.tooltip as { value: string }).value, /已取消/);
+  assert.equal(h.writes.length, 0);
+});
+
+test("changed node lists discard batch results; configuration changes abort requests and suppress late UI", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  h.api.testDelay = async () => { h.state.proxies["new-node"] = { type: "VLESS" }; return { ok: true, ms: 123 }; };
+  await h.monitor.testAllNodes();
+  assert.ok(h.warnings.some((text) => text.includes("节点列表在测速期间发生变化")));
+  assert.doesNotMatch((h.bar.tooltip as { value: string }).value, /\*\*全部节点测速\*\*/);
+  h.api.testDelay = async (_node, _url, _timeout, signal) => {
+    await new Promise<void>((resolve) => signal!.addEventListener("abort", () => resolve(), { once: true }));
+    return { ok: true, ms: 99 };
+  };
+  const pending = h.monitor.testAllNodes();
+  await new Promise((resolve) => setImmediate(resolve));
+  h.config.enabled = false;
+  h.monitor.reloadConfiguration();
+  await pending;
+  assert.equal(h.shown(), false);
+  h.fakeVscode.workspace.isTrusted = false;
+  await h.monitor.testAllNodes();
+  assert.equal(h.shown(), false);
 });
 
 test("runtime controls use the existing hover, keep start available while stopped, and update without adding or choosing a subscription", async (t) => {

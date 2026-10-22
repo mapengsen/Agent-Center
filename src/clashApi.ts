@@ -53,12 +53,12 @@ export class ClashApiClient {
     catch { return false; } // Older Clash/Mihomo versions may not expose this API.
   }
 
-  public async testDelay(node: string, url: string, timeoutMs: number): Promise<DelayResult> {
+  public async testDelay(node: string, url: string, timeoutMs: number, signal?: AbortSignal): Promise<DelayResult> {
     try {
       const query = new URLSearchParams({ url, timeout: String(timeoutMs) });
       const response = await this.request(
         "/proxies/" + encodeURIComponent(node) + "/delay?" + query.toString(),
-        "GET", undefined, timeoutMs + 1500,
+        "GET", undefined, timeoutMs + 1500, signal,
       );
       if (!isRecord(response) || typeof response.delay !== "number" ||
           !Number.isFinite(response.delay) || response.delay <= 0) {
@@ -71,7 +71,7 @@ export class ClashApiClient {
   }
 
   private async request(
-    path: string, method = "GET", body?: unknown, timeoutMs = this.options.timeoutMs,
+    path: string, method = "GET", body?: unknown, timeoutMs = this.options.timeoutMs, signal?: AbortSignal,
   ): Promise<unknown> {
     const target = new URL(this.options.controller.replace(/\/+$/, "") + path);
     if (!["http:", "https:"].includes(target.protocol)) throw new Error("Clash 控制器必须使用 HTTP/HTTPS。");
@@ -84,7 +84,7 @@ export class ClashApiClient {
     }
     // The controller must bypass environment HTTP proxies, including Clash itself.
     return await new Promise((resolve, reject) => {
-      const request = (target.protocol === "https:" ? https : http).request(target, { method, headers }, (response) => {
+      const request = (target.protocol === "https:" ? https : http).request(target, { method, headers, signal }, (response) => {
         const chunks: Buffer[] = [];
         let bytes = 0;
         response.on("error", reject);

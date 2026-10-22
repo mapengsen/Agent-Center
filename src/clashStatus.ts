@@ -2,12 +2,13 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { ClashApiClient, findActiveGroup, resolveProxyChain } from "./clashApi";
 import { CLASH_TEST_URL, loadClashConnection, type ClashSettings } from "./clashConfig";
-import { clashTooltip, clashControlLinks, commandLink, escapeMarkdown, formatClashDelay, type ClashSnapshot } from "./clashPresentation";
+import { clashTooltip, clashControlLinks, commandLink, escapeMarkdown, formatClashDelay, nodeDelayText, type ClashSnapshot } from "./clashPresentation";
 import { discoverClashSubscriptions, validateSubscriptionUrl } from "./clashSubscriptions";
 import { discoverClashControl, type ClashControlAction } from "./clashControl";
 import { controllerListening } from "./clashRuntime";
 import { subscriptionDnsEnabled } from "./clashDns";
 import type { ClashWebProbe } from "./clashWebProbe";
+import { clashNodeNames, clashNodeTestContext, testClashNodes, type ClashNodeTests } from "./clashNodeTests";
 import type { NetworkStatusPresentation } from "./networkStatus";
 
 interface NodeSelection { group: string; node: string }
@@ -30,6 +31,9 @@ export class ClashStatusMonitor implements vscode.Disposable {
   private networkStatus: NetworkStatusPresentation | undefined;
   private clashView: { text: string; tooltip: string; warning: boolean } | undefined;
   private dnsVerification: { checkedAt: string; result: ClashWebProbe; backupDirectory: string } | undefined;
+  private nodeTests: (ClashNodeTests & { context: string }) | undefined;
+  private nodeTestAbort: AbortController | undefined;
+  private nodeTestPending: Promise<void> | undefined;
 
   public constructor() {
     this.statusBar = vscode.window.createStatusBarItem("agentStatus.clash", vscode.StatusBarAlignment.Right, 70);
@@ -70,6 +74,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
         const list = await (await discoverClashSubscriptions(connection.configPath, settings.installDirectory)).list();
         if (!this.active(generation)) return;
         if (!list.active) {
+          this.nodeTests = undefined;
           this.noActiveSubscription = true;
           this.snapshot = undefined;
           this.lastError = "";
@@ -103,6 +108,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
       if (!this.active(generation)) return;
       this.snapshot = { state, group, chain, delay, subscription, updatedAt: new Date(), subscriptionDns,
         dnsWebVerification: this.dnsVerification ? this.dnsVerification.result.detail + "（" + this.dnsVerification.checkedAt + "）" : undefined };
+      if (this.nodeTests?.context !== clashNodeTestContext(connection.controller, connection.configPath, subscription, state.proxies)) this.nodeTests = undefined;
       this.renderSnapshot();
     } catch (error) {
       if (!this.active(generation)) return;
@@ -129,6 +135,82 @@ export class ClashStatusMonitor implements vscode.Disposable {
     }
   }
 
+  public testAllNodes(): Promise<void> {
+    if (this.nodeTestPending) return this.nodeTestPending;
+    if (this.disposed || !enabled() || !vscode.workspace.isTrusted || this.choosing) return Promise.resolve();
+    this.choosing = true;
+    const controller = new AbortController();
+    this.nodeTestAbort = controller;
+    this.nodeTestPending = this.runNodeTests(this.generation, controller).finally(() => {
+      this.nodeTestPending = undefined;
+      this.nodeTestAbort = undefined;
+      this.choosing = false;
+    });
+    return this.nodeTestPending;
+  }
+
+  public cancelNodeTests(): void { this.nodeTestAbort?.abort(); }
+
+  private async runNodeTests(generation: number, controller: AbortController): Promise<void> {
+    const signal = controller.signal;
+    try {
+      await this.pending;
+      if (!this.active(generation) || signal.aborted) return;
+      if (!this.snapshot) await this.update("automatic", generation);
+      if (!this.active(generation) || signal.aborted) return;
+      if (!this.snapshot || this.proxyStopped || this.noActiveSubscription) throw new Error("请先开启并连接 Clash 后再测速。");
+      const settings = readSettings();
+      const connection = await loadClashConnection(settings);
+      const api = new ClashApiClient(connection);
+      const state = await api.getState();
+      if (!this.active(generation) || signal.aborted) return;
+      const nodes = clashNodeNames(state.proxies);
+      if (!nodes.length) { void vscode.window.showInformationMessage("当前 Clash 没有已加载的代理节点可测速。"); return; }
+      const tests: ClashNodeTests & { context: string } = { total: nodes.length, results: [], startedAt: new Date(), running: true, cancelled: false,
+        context: clashNodeTestContext(connection.controller, connection.configPath, this.snapshot.subscription, state.proxies) };
+      this.nodeTests = tests;
+      this.renderSnapshot();
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Clash：全部节点测速", cancellable: true }, async (progress, token) => {
+        const cancellation = token.onCancellationRequested(() => controller.abort());
+        try {
+          if (token.isCancellationRequested) controller.abort();
+          await testClashNodes(api, nodes, CLASH_TEST_URL, settings.testTimeoutMs, signal, (result) => {
+            if (!this.active(generation)) { controller.abort(); return; }
+            if (signal.aborted) return;
+            tests.results.push(result);
+            progress.report({ increment: 100 / nodes.length, message: tests.results.length + "/" + nodes.length });
+            this.renderSnapshot();
+          });
+        } finally { cancellation.dispose(); }
+      });
+      if (!this.active(generation)) return;
+      tests.running = false;
+      tests.cancelled = signal.aborted;
+      tests.finishedAt = new Date();
+      if (!signal.aborted) {
+        const latest = await api.getState();
+        if (!this.active(generation)) return;
+        if (tests.context !== clashNodeTestContext(connection.controller, connection.configPath, this.snapshot?.subscription, latest.proxies)) {
+          this.nodeTests = undefined;
+          this.renderSnapshot();
+          void vscode.window.showWarningMessage("Clash 节点列表在测速期间发生变化，请重新测速。");
+          return;
+        }
+      }
+      this.renderSnapshot();
+      const good = tests.results.filter((result) => result.delay.ok).length;
+      void vscode.window.showInformationMessage(tests.cancelled
+        ? "Clash 全部节点测速已取消，已完成 " + tests.results.length + "/" + tests.total + "。"
+        : "Clash 全部节点测速完成：" + good + " 个可用，" + (tests.total - good) + " 个超时。结果已显示在右下角悬浮卡片。");
+    } catch (error) {
+      controller.abort();
+      if (!this.active(generation)) return;
+      this.nodeTests = undefined;
+      this.renderSnapshot();
+      void vscode.window.showErrorMessage("Clash 全部节点测速失败：" + message(error));
+    }
+  }
+
   public async manageControl(action: ClashControlAction): Promise<void> {
     if (this.disposed || !enabled() || !vscode.workspace.isTrusted || this.choosing) return;
     this.choosing = true;
@@ -143,6 +225,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
       if (!this.active(generation)) return;
       const title = { start: "开启代理", stop: "关闭代理", update: "更新当前订阅", "subscription-dns": "让 DNS 使用订阅配置", "restore-dns": "恢复原 DNS 覆写" }[action];
       attempted = true;
+      this.nodeTests = undefined;
       const result = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Clash：正在" + title + "…" },
         () => control.execute(action, connection),
@@ -204,7 +287,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
         const selected = await vscode.window.showQuickPick<Pick>((proxy?.all ?? []).map((name) => ({
           label: name,
           value: name,
-          description: name === proxy.now ? "✓ 当前选择" : undefined,
+          description: (name === proxy.now ? "✓ 当前选择" : "") + nodeDelayText(this.nodeTests, name),
           detail: resolveProxyChain(state.proxies, name).join(" → "),
         })), { placeHolder: "选择 " + group + " 的节点", matchOnDetail: true });
         if (!selected) return;
@@ -323,15 +406,18 @@ export class ClashStatusMonitor implements vscode.Disposable {
       if (this.active(generation)) void vscode.window.showErrorMessage("Clash 订阅操作失败：" + message(error));
     } finally {
       this.choosing = false;
+      if (attempted) this.nodeTests = undefined;
       if (attempted && this.active(generation)) await this.refresh();
     }
   }
 
   public reloadConfiguration(): void {
+    this.cancelNodeTests();
     this.generation++;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.snapshot = undefined;
+    this.nodeTests = undefined;
     this.connectionFound = false;
     this.noActiveSubscription = false;
     this.controller = "";
@@ -343,6 +429,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
     // Wait out the previous configuration's request before starting its replacement.
     void (async () => {
       await this.pending;
+      await this.nodeTestPending;
       if (!this.active(generation)) return;
       await this.refresh();
       this.schedule(generation);
@@ -355,6 +442,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
       extensionHost: vscode.env.remoteName ?? "local",
       controller: this.controller, configPath: this.configPath,
       dnsVerification: this.dnsVerification,
+      nodeTests: this.nodeTests,
       group: this.snapshot?.group, mode: this.snapshot?.state.mode,
       chain: this.snapshot?.chain, delay: this.snapshot?.delay,
       subscription: this.snapshot?.subscription,
@@ -364,6 +452,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
   }
 
   public dispose(): void {
+    this.cancelNodeTests();
     this.disposed = true;
     this.generation++;
     if (this.timer) clearTimeout(this.timer);
@@ -384,7 +473,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
 
   private renderSnapshot(): void {
     if (!this.snapshot) return;
-    this.showClashStatus("$(globe) " + formatClashDelay(this.snapshot.delay), clashTooltip(this.snapshot), !this.snapshot.delay.ok);
+    this.showClashStatus("$(globe) " + formatClashDelay(this.snapshot.delay), clashTooltip({ ...this.snapshot, nodeTests: this.nodeTests }), !this.snapshot.delay.ok);
   }
 
   private renderError(): void {
@@ -395,6 +484,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
   }
 
   private renderStopped(): void {
+    this.nodeTests = undefined;
     this.showClashStatus("$(globe) Clash 已关闭", "**Clash 代理已关闭**\n\n" +
       "订阅配置已保留，可点击开启代理。\n\n" + clashControlLinks() + "\n\n" +
       commandLink("添加订阅", "agentStatus.addClashSubscription") + " · " +
@@ -431,7 +521,8 @@ function trustedMarkdown(value: string): vscode.MarkdownString {
   const result = new vscode.MarkdownString(value);
   result.isTrusted = { enabledCommands: ["agentStatus.chooseClashNode", "agentStatus.refreshClash", "agentStatus.refreshNetwork", "agentStatus.openSettings",
     "agentStatus.chooseClashSubscription", "agentStatus.addClashSubscription", "agentStatus.removeClashSubscription",
-    "agentStatus.startClash", "agentStatus.stopClash", "agentStatus.updateClashSubscription", "agentStatus.useSubscriptionDns", "agentStatus.restoreClashDns"] };
+    "agentStatus.startClash", "agentStatus.stopClash", "agentStatus.updateClashSubscription", "agentStatus.useSubscriptionDns", "agentStatus.restoreClashDns",
+    "agentStatus.testAllClashNodes", "agentStatus.cancelClashNodeTests"] };
   return result;
 }
 
