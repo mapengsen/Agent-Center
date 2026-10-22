@@ -9,6 +9,7 @@ import { controllerListening } from "./clashRuntime";
 import { subscriptionDnsEnabled } from "./clashDns";
 import type { ClashWebProbe } from "./clashWebProbe";
 import { clashNodeNames, clashNodeTestContext, testClashNodes, type ClashNodeTests } from "./clashNodeTests";
+import { findBestClashNode, selectBestClashNode } from "./clashBestNode";
 import type { NetworkStatusPresentation } from "./networkStatus";
 
 interface NodeSelection { group: string; node: string }
@@ -135,13 +136,16 @@ export class ClashStatusMonitor implements vscode.Disposable {
     }
   }
 
-  public testAllNodes(): Promise<void> {
-    if (this.nodeTestPending) return this.nodeTestPending;
+  public testAllNodes(selectBest = false): Promise<void> {
+    if (this.nodeTestPending) {
+      if (selectBest) void vscode.window.showInformationMessage("已有测速任务正在运行，请等待完成后再点击测速并切换最佳节点。");
+      return this.nodeTestPending;
+    }
     if (this.disposed || !enabled() || !vscode.workspace.isTrusted || this.choosing) return Promise.resolve();
     this.choosing = true;
     const controller = new AbortController();
     this.nodeTestAbort = controller;
-    this.nodeTestPending = this.runNodeTests(this.generation, controller).finally(() => {
+    this.nodeTestPending = this.runNodeTests(this.generation, controller, selectBest).finally(() => {
       this.nodeTestPending = undefined;
       this.nodeTestAbort = undefined;
       this.choosing = false;
@@ -151,7 +155,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
 
   public cancelNodeTests(): void { this.nodeTestAbort?.abort(); }
 
-  private async runNodeTests(generation: number, controller: AbortController): Promise<void> {
+  private async runNodeTests(generation: number, controller: AbortController, selectBest: boolean): Promise<void> {
     const signal = controller.signal;
     try {
       await this.pending;
@@ -164,13 +168,17 @@ export class ClashStatusMonitor implements vscode.Disposable {
       const api = new ClashApiClient(connection);
       const state = await api.getState();
       if (!this.active(generation) || signal.aborted) return;
+      const targetGroup = findActiveGroup(state, settings.group, connection.preferredGroups);
+      if (selectBest && (state.mode === "direct" || state.proxies[targetGroup]?.type !== "Selector")) {
+        throw new Error("当前模式或策略组不支持手动切换，请使用规则/全局模式，并选择可手动切换的策略组。");
+      }
       const nodes = clashNodeNames(state.proxies);
       if (!nodes.length) { void vscode.window.showInformationMessage("当前 Clash 没有已加载的代理节点可测速。"); return; }
       const tests: ClashNodeTests & { context: string } = { total: nodes.length, results: [], startedAt: new Date(), running: true, cancelled: false,
         context: clashNodeTestContext(connection.controller, connection.configPath, this.snapshot.subscription, state.proxies) };
       this.nodeTests = tests;
       this.renderSnapshot();
-      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Clash：全部节点测速", cancellable: true }, async (progress, token) => {
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: selectBest ? "Clash：测速并切换最佳节点" : "Clash：全部节点测速", cancellable: true }, async (progress, token) => {
         const cancellation = token.onCancellationRequested(() => controller.abort());
         try {
           if (token.isCancellationRequested) controller.abort();
@@ -196,6 +204,34 @@ export class ClashStatusMonitor implements vscode.Disposable {
           void vscode.window.showWarningMessage("Clash 节点列表在测速期间发生变化，请重新测速。");
           return;
         }
+      }
+      tests.cancelled = signal.aborted;
+      if (selectBest && !tests.cancelled) {
+        const plan = findBestClashNode(state, targetGroup, tests.results);
+        if (!plan) {
+          tests.bestSelection = "当前策略组没有可手动切换且测速成功的节点，保留原选择。";
+          this.renderSnapshot();
+          void vscode.window.showWarningMessage(tests.bestSelection);
+          return;
+        }
+        try {
+          const selected = await selectBestClashNode(api, state, plan, signal, () => this.active(generation));
+          if (!this.active(generation)) return;
+          this.snapshot = { ...this.snapshot!, state: selected.state, group: targetGroup,
+            chain: resolveProxyChain(selected.state.proxies, targetGroup), delay: { ok: true, ms: plan.ms }, updatedAt: new Date() };
+          tests.bestSelection = (selected.changed ? "已切换至" : "当前已是") + "本轮最低延迟可用节点：" + plan.node + "（" + plan.ms + " ms）。";
+          this.renderSnapshot();
+          void vscode.window.showInformationMessage(tests.bestSelection);
+        } catch (error) {
+          if (!this.active(generation)) return;
+          tests.cancelled = signal.aborted;
+          tests.bestSelection = message(error);
+          await this.update("automatic", generation);
+          if (!this.active(generation)) return;
+          this.renderSnapshot();
+          void vscode.window.showWarningMessage(tests.bestSelection);
+        }
+        return;
       }
       this.renderSnapshot();
       const good = tests.results.filter((result) => result.delay.ok).length;
@@ -522,7 +558,7 @@ function trustedMarkdown(value: string): vscode.MarkdownString {
   result.isTrusted = { enabledCommands: ["agentStatus.chooseClashNode", "agentStatus.refreshClash", "agentStatus.refreshNetwork", "agentStatus.openSettings",
     "agentStatus.chooseClashSubscription", "agentStatus.addClashSubscription", "agentStatus.removeClashSubscription",
     "agentStatus.startClash", "agentStatus.stopClash", "agentStatus.updateClashSubscription", "agentStatus.useSubscriptionDns", "agentStatus.restoreClashDns",
-    "agentStatus.testAllClashNodes", "agentStatus.cancelClashNodeTests"] };
+    "agentStatus.testAllClashNodes", "agentStatus.cancelClashNodeTests", "agentStatus.testAndSelectBestClashNode"] };
   return result;
 }
 

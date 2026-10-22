@@ -20,6 +20,7 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
 | 全部节点并行测速 | 手动一键测试当前 Clash 已加载的全部实际节点，最多 5 个并行；原悬浮卡片按延迟展示结果，支持取消，不切换当前节点。 |
+| 测速并切换最佳节点 | 新测一轮后，切换至当前策略组可手动选择范围内 Google 延迟最低的成功节点；支持嵌套手动组，核验切换，失败尝试恢复原选择。 |
 | 开启与关闭代理 | 在同一悬浮卡片调用原生 Clash 开关，核验控制器启动或停止；关闭后仍保留开启入口，订阅不会被删除。 |
 | 更新当前订阅 | 重新下载当前订阅并校验、强制加载到运行中的 Clash，保留仍可用的手动节点选择；失败恢复原配置。关闭时更新后仍保持关闭。 |
 | DNS 使用订阅配置 | 移除本地 DNS 解析策略覆写，保留本机 DNS 启用、监听和 IPv6 设置，更新当前订阅并核验最终 DNS。提供备份和恢复原覆写，通过当前代理下载 Google 完整网页并单独报告结果。支持 Linux/WSL。 |
@@ -107,6 +108,14 @@ Codex 默认读取 `CODEX_HOME/auth.json` 或 `~/.codex/auth.json`，Claude 默�
 
 命令面板：**Agent Center: Refresh Clash Node Speed**、**Agent Center: Choose Clash Node**、**Agent Center: Show Diagnostics**（查看 clash 字段）。
 
+### 测速并切换最佳节点
+
+点击原悬浮卡片的 **测速并切换最佳节点**，或运行 **Agent Center: Test and Select Best Clash Node**。每次重新执行最多 5 个并行的全量延迟测试，再从**当前策略组通过手动 Selector 选择链可到达**的成功节点中选出 Google 延迟最低者；延迟相同时优先当前最终节点。“最佳”只表示本轮 Google 延迟，不代表带宽或所有网站的可用性。
+
+嵌套手动组先调整内层再调整外层，并核验最终选择链；已经是最佳手动选择时不重复切换。全部候选失败或测速阶段取消时保持原选择。切换前检查模式、相关策略组和手动选择是否变化；失败时尝试恢复本次已修改的选择，不覆盖检测到的其他客户端后续选择，并明确报告恢复结果。结果和切换说明显示在同一个悬浮卡片，更新状态栏当前节点与延迟。
+
+该操作不改路由模式、订阅、规则、DNS 或配置文件。直连模式及当前组只支持自动选择时会提示先选择可手动切换的策略组，不强制固定自动组。保留原来的 **全部节点测速** 按钮，它仍然只测试、不切换。五分钟自动任务仍只测当前节点，不自动选最佳节点。
+
 ### 添加、切换与删除订阅（clash-for-linux）
 
 在状态栏悬停菜单点击“添加订阅”“切换订阅”或“删除订阅”。也可在命令面板执行 **Agent Center: Add Clash Subscription**、**Agent Center: Choose Clash Subscription** 或 **Agent Center: Remove Clash Subscription**。
@@ -190,6 +199,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 | Agent Center: Test Google Website Connectivity | 立即运行扩展宿主的 Google 联网检测。 |
 | Agent Center: Refresh Clash Node Speed | 刷新 Clash 状态并检测当前选择节点的 Google 延迟。 |
 | Agent Center: Test All Clash Nodes | 手动并行测试当前已加载全部实际节点，在原悬浮卡片显示结果。 |
+| Agent Center: Test and Select Best Clash Node | 新测速后切换当前策略组可手动到达的最低延迟成功节点，并核验或恢复。 |
 | Agent Center: Cancel Clash Node Tests | 取消本轮全部节点测速，保留已完成结果。 |
 | Agent Center: Start Clash Proxy | 开启当前环境的 Clash 代理并核验配置加载。 |
 | Agent Center: Stop Clash Proxy | 关闭 Clash 代理并确认控制器停止，保留订阅。 |
@@ -228,6 +238,10 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.30 - 2026-10-22
+
+- 新增“测速并切换最佳节点”：新测一轮，选当前策略组可手动到达的最低延迟可用节点，支持嵌套手动组、切换核验和失败恢复；原纯测速与自动任务保持原行为。
 
 ### 0.1.29 - 2026-10-22
 

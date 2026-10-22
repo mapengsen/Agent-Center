@@ -152,6 +152,7 @@ async function monitorHarness(t: TestContext) {
   const picks: Array<{ label: string; value: string } | undefined> = [];
   const shownPicks: Array<Array<{ label: string; value: string; description?: string; detail?: string }>> = [];
   const notices: string[] = [];
+  const errors: string[] = [];
   const warnings: string[] = [];
   const commands: string[] = [];
   const progressCancellations = new Set<() => void>();
@@ -206,7 +207,7 @@ async function monitorHarness(t: TestContext) {
         isCancellationRequested: false,
         onCancellationRequested: (listener: () => void) => { progressCancellations.add(listener); return { dispose: () => progressCancellations.delete(listener) }; },
       }),
-      showInformationMessage: async (text: string) => { notices.push(text); }, showErrorMessage: async () => undefined,
+      showInformationMessage: async (text: string) => { notices.push(text); }, showErrorMessage: async (text: string) => { errors.push(text); },
     },
   };
   const entry = require.resolve("../clashStatus");
@@ -227,7 +228,7 @@ async function monitorHarness(t: TestContext) {
   const monitor = new module.exports.ClashStatusMonitor();
   t.after(() => monitor.dispose());
   return { monitor, state, writes, bar, fakeVscode, config, api, inputs, picks, shownInputs, shownPicks, subscriptions, subscriptionCalls,
-    notices, warnings, commands, control, controlCalls, cancelProgress: () => progressCancellations.forEach((listener) => listener()),
+    notices, warnings, errors, commands, control, controlCalls, cancelProgress: () => progressCancellations.forEach((listener) => listener()),
     shown: () => shown, failDelay: () => { timeout = true; } };
 }
 
@@ -241,7 +242,7 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.match(hover.value, /3349 ms/);
   assert.match(hover.value, /我的机场（default）/);
   assert.doesNotMatch(hover.value, /showClashDetails/);
-  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription", "useSubscriptionDns", "restoreClashDns", "testAllClashNodes", "cancelClashNodeTests"]) {
+  for (const command of ["chooseClashNode", "refreshClash", "openSettings", "chooseClashSubscription", "addClashSubscription", "removeClashSubscription", "startClash", "stopClash", "updateClashSubscription", "useSubscriptionDns", "restoreClashDns", "testAllClashNodes", "cancelClashNodeTests", "testAndSelectBestClashNode"]) {
     if (command === "cancelClashNodeTests") { assert.ok(hover.isTrusted.enabledCommands.includes("agentStatus." + command)); continue; }
     assert.ok(hover.value.includes("command:agentStatus." + command));
     assert.ok(hover.isTrusted.enabledCommands.includes("agentStatus." + command));
@@ -314,6 +315,47 @@ test("changed node lists discard batch results; configuration changes abort requ
   h.fakeVscode.workspace.isTrusted = false;
   await h.monitor.testAllNodes();
   assert.equal(h.shown(), false);
+});
+
+test("one-click best-node selection runs a fresh batch and renders the verified fastest node", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  const tested: string[] = [];
+  h.api.testDelay = async (node) => { tested.push(node!); return { ok: true, ms: node === "node-b" ? 50 : 100 }; };
+  await h.monitor.testAllNodes(true);
+  assert.deepEqual(tested.sort(), ["node-a", "node-b"]);
+  assert.deepEqual(h.writes, [{ group: "🔰 节点选择", node: "node-b" }]);
+  assert.equal(h.bar.text, "$(globe) √ Google（50 ms）");
+  assert.match((h.bar.tooltip as { value: string }).value, /最佳节点切换.*已切换至/s);
+  assert.ok(h.notices.some((text) => text.includes("最低延迟") && text.includes("node-b")));
+});
+
+test("best-node selection keeps the current choice on total failure and refuses direct mode", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();h.failDelay();
+  await h.monitor.testAllNodes(true);
+  assert.deepEqual(h.writes, []);
+  assert.ok(h.warnings.some((text) => text.includes("保留原选择")));
+  h.state.mode = "direct";
+  await h.monitor.testAllNodes(true);
+  assert.deepEqual(h.writes, []);
+  assert.ok(h.errors.some((text) => text.includes("不支持手动切换")));
+});
+
+test("cancelled best-node tests cannot switch and a plain batch cannot be upgraded by a second click", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.refresh();
+  h.api.testDelay = async (_node, _url, _timeout, signal) => {
+    await new Promise<void>((resolve) => signal!.addEventListener("abort", () => resolve(), { once: true }));
+    return { ok: true, ms: 10 };
+  };
+  const first = h.monitor.testAllNodes(true);
+  await new Promise((resolve) => setImmediate(resolve));h.cancelProgress();await first;
+  assert.deepEqual(h.writes, []);
+  const plain = h.monitor.testAllNodes();
+  assert.equal(plain, h.monitor.testAllNodes(true));
+  await new Promise((resolve) => setImmediate(resolve));h.cancelProgress();await plain;
+  assert.deepEqual(h.writes, []);
 });
 
 test("runtime controls use the existing hover, keep start available while stopped, and update without adding or choosing a subscription", async (t) => {

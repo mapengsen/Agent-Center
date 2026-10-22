@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.30 - 2026-10-22
+
+### Added / 新增
+
+- Add Test and Select Best Clash Node to the existing hover and command palette. Run a fresh five-at-a-time Google delay batch, choose the lowest successful delay reachable through the current group's manual selectors, prefer the current final node on ties, apply nested selections inside out and verify the effective final node.
+- 原悬浮卡片和命令面板新增“测速并切换最佳节点”：重新执行最多 5 个并行的 Google 延迟测试，在当前策略组的手动选择链范围内取最低成功延迟，同延迟优先当前最终节点，内层到外层切换并核验实际节点。
+- Preserve choices on total candidate failure or testing cancellation; detect changed modes/groups/manual choices before switching and attempt recovery of own writes after failure. Report outcomes in the existing hover and status bar. Do not alter routing mode, subscription data, DNS or test-only/automatic behavior.
+- 候选全部失败或测速取消时保留原选择，切换前核对模式、策略组和手动选择，失败尝试恢复本次写入；在原悬浮卡片和状态栏报告结果。不改路由模式、订阅、DNS，原纯测速及自动任务行为不变。
+
 ## 0.1.29 - 2026-10-22
 
 ### Added / 新增

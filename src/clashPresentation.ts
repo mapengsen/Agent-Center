@@ -58,6 +58,7 @@ export function clashTooltip(snapshot: ClashSnapshot): string {
   }
   lines.push(commandLink("全部节点", "agentStatus.chooseClashNode") + " · " +
     commandLink("全部节点测速", "agentStatus.testAllClashNodes") + " · " +
+    commandLink("测速并切换最佳节点", "agentStatus.testAndSelectBestClashNode") + " · " +
     commandLink("刷新测速", "agentStatus.refreshClash") + " · " +
     commandLink("设置", "agentStatus.openSettings"));
   lines.push(commandLink("切换订阅", "agentStatus.chooseClashSubscription") + " · " +
@@ -69,6 +70,7 @@ export function clashTooltip(snapshot: ClashSnapshot): string {
       (tests.running ? "（测速中，最多 5 个并行） · " + commandLink("取消测速", "agentStatus.cancelClashNodeTests")
         : tests.cancelled ? "（已取消，保留已完成结果）" : "（完成，按延迟排序）"));
     lines.push("本轮测速：" + (tests.finishedAt ?? tests.startedAt).toISOString());
+    if (tests.bestSelection) lines.push("**最佳节点切换**：" + escapeMarkdown(tests.bestSelection));
     const rows = sortedNodeDelays(tests.results).map(({ node, delay }) => {
       const label = proxy?.type === "Selector" && proxy.all?.includes(node)
         ? commandLink(node, "agentStatus.chooseClashNode", [{ group, node }]) : escapeMarkdown(node);

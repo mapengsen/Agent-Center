@@ -9,6 +9,7 @@ export interface ClashNodeTests {
   finishedAt?: Date;
   running: boolean;
   cancelled: boolean;
+  bestSelection?: string;
 }
 
 const SKIP_TYPES = new Set(["direct", "reject", "rejectdrop", "compatible", "pass", "dns",

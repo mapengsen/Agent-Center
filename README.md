@@ -20,6 +20,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
 | Test all Clash nodes in parallel | Manually test all concrete nodes loaded by the current Clash core, up to five at a time. Show sorted results in the existing hover, support cancellation and send no node-selection commands. |
+| Test and select the best node | Run a fresh batch and select the successful node with the lowest Google latency reachable through the current group's manual selectors. Support nested selectors, verify the effective node and attempt recovery on failure. |
 | Start and stop the proxy | Use native Clash controls in the same hover, verify the controller starts or stops, retain subscriptions and keep the start action available while stopped. |
 | Update the current subscription | Download the saved active source again, force-load and verify the running configuration, preserve available manual choices and restore the previous state on failure. Updates while stopped keep the service stopped. |
 | Use subscription DNS | Remove conflicting local DNS resolution overrides, keep host DNS enable/listen/IPv6 settings, update the active source and verify the generated DNS policy. Preserve backups, support restoring original DNS overrides and check a complete Google webpage through the current local proxy. Linux/WSL only. |
@@ -107,6 +108,14 @@ All requests run in the extension host, so 127.0.0.1 in Remote SSH refers to the
 
 Commands: **Agent Center: Refresh Clash Node Speed**, **Agent Center: Choose Clash Node**, and **Agent Center: Show Diagnostics** (the clash field).
 
+### Test and select the best node
+
+Click **测速并切换最佳节点** in the existing hover, or run **Agent Center: Test and Select Best Clash Node**. Every invocation runs a fresh batch with up to five concurrent tests, then picks the successful node with the lowest Google latency **reachable through manual Selector groups from the current group**. Equal delays prefer the current final node. “Best” refers to this batch's Google latency, rather than bandwidth or availability of every website.
+
+Nested manual selectors are changed from the inside out, then the effective final node is verified. An already-selected best manual path needs no writes. Failed candidates or cancellation during testing leave selections unchanged. Before switching, the mode, relevant groups and manual choices are checked for changes. A failed switch attempts to restore this operation's writes without overwriting detected later choices from another client, and reports recovery status. Results and selection details stay in the same hover; the status bar reflects the verified node and delay.
+
+This action does not change routing mode, subscriptions, rules, DNS or configuration files. Direct mode and an automatic-only current group require a manual selector first; automatic groups are not forcibly pinned. The existing **全部节点测速** action remains test-only, and the five-minute automatic task still tests the current node without selecting a new one.
+
 ### Start, stop and update the current subscription
 
 The existing status-bar hover includes **开启代理**, **关闭代理** and **更新当前订阅**, also available as the commands below. These call [wnlen/clash-for-linux](https://github.com/wnlen/clash-for-linux)'s native `clash on`, `clash off` and `clash sub update`. Updating reuses the saved source URL; “Refresh Clash Node Speed” still only tests latency.
@@ -188,6 +197,7 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 | Agent Center: Test Google Website Connectivity | Run the extension-host Google check immediately. |
 | Agent Center: Refresh Clash Node Speed | Read Clash state and test the selected node's Google latency. |
 | Agent Center: Test All Clash Nodes | Manually test all loaded concrete nodes in parallel and show results in the existing hover. |
+| Agent Center: Test and Select Best Clash Node | Run fresh tests, select the lowest-latency successful node reachable through the current manual group, and verify or recover. |
 | Agent Center: Cancel Clash Node Tests | Cancel the current all-node batch, retaining completed results. |
 | Agent Center: Start Clash Proxy | Start the current environment's native proxy and verify its loaded configuration. |
 | Agent Center: Stop Clash Proxy | Stop the proxy, verify the controller stops and retain subscriptions. |
@@ -226,6 +236,10 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.30 - 2026-10-22
+
+- Add “Test and Select Best Clash Node”: run a fresh batch, select the fastest successful node reachable through the current group's manual selector chain, verify the result and recover on failures. Test-only and automatic actions retain their behavior.
 
 ### 0.1.29 - 2026-10-22
 

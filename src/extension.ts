@@ -28,6 +28,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("agentStatus.restartCodexImageLinks", () => codexImageLinks.restart()),
     vscode.commands.registerCommand("agentStatus.refreshClash", () => clashStatus.refresh("manual")),
     vscode.commands.registerCommand("agentStatus.testAllClashNodes", () => clashStatus.testAllNodes()),
+    vscode.commands.registerCommand("agentStatus.testAndSelectBestClashNode", () => clashStatus.testAllNodes(true)),
     vscode.commands.registerCommand("agentStatus.cancelClashNodeTests", () => clashStatus.cancelNodeTests()),
     vscode.commands.registerCommand("agentStatus.startClash", () => clashStatus.manageControl("start")),
     vscode.commands.registerCommand("agentStatus.stopClash", () => clashStatus.manageControl("stop")),
