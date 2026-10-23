@@ -38,7 +38,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 
 | Automatic task | Default schedule | Manual action |
 | --- | --- | --- |
-| Codex quota | At startup, three more checks 60 seconds apart, then every **3 minutes**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
+| Codex quota | At startup, three more checks 60 seconds apart, then every **2 minutes (120 seconds)**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
 | Claude quota | At startup, three more checks 60 seconds apart, then every **15 minutes**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
 | VS Code host → Google | At startup, then every **5 hours**, and immediately after a successful subscription update. | Choose “立即检测联网” in the hover card. |
 | Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. Successful subscription updates additionally test all loaded nodes in parallel. | Choose “刷新测速” in the hover card. |
@@ -240,6 +240,10 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.32 - 2026-10-23
+
+- Refresh Codex quotas every 120 seconds (two minutes) by default, retaining configured overrides, startup checks, failure retries and manual refresh.
 
 ### 0.1.31 - 2026-10-22
 

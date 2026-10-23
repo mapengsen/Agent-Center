@@ -48,7 +48,7 @@ test("uses startup cadence and retries failed regular refreshes", () => {
   assert.equal(REGULAR_USAGE_REFRESH_RETRY_INTERVAL_SECONDS, 30);
   assert.equal(MAX_REGULAR_USAGE_REFRESH_ATTEMPTS, 5);
   assert.equal(DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS, 900);
-  assert.equal(DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS, 180);
+  assert.equal(DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS, 120);
   for (const interval of [DEFAULT_CODEX_USAGE_REFRESH_INTERVAL_SECONDS, DEFAULT_USAGE_REFRESH_INTERVAL_SECONDS]) {
     const cadence = new UsageRefreshCadence();
     for (let remaining = 3; remaining > 0; remaining -= 1) {

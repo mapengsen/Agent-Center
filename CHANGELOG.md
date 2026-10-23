@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.32 - 2026-10-23
+
+### Changed / 变更
+
+- Refresh Codex quotas every 120 seconds (two minutes) by default. Preserve existing custom settings, startup checks, retries and manual refresh; other feature intervals remain unchanged.
+- Codex 额度默认每 120 秒（2 分钟）刷新，保留已有自定义设置、启动刷新、失败重试和手动刷新，其他功能的间隔保持不变。
+
 ## 0.1.31 - 2026-10-22
 
 ### Changed / 变更
