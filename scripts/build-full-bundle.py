@@ -38,7 +38,7 @@ def main():
         raise SystemExit("The output must not overwrite the VSIX.")
     source_names = git("ls-files", "-z").decode("utf-8").rstrip("\0").split("\0")
     files = {}
-    with zipfile.ZipFile(io.BytesIO(git("archive", "--format=zip", "HEAD"))) as source:
+    with zipfile.ZipFile(io.BytesIO(git("-c", "core.autocrlf=false", "archive", "--format=zip", "HEAD"))) as source:
         archived_names = {name for name in source.namelist() if not name.endswith("/")}
         if archived_names != set(source_names):
             raise SystemExit("The source archive does not include every tracked project file.")
