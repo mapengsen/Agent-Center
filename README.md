@@ -233,6 +233,22 @@ Each option in the last column uses its row's prefix, for example `agentStatus.n
 
 **Agent Center: Show Diagnostics** opens the output channel with `codex`, `codexProvider`, `claude`, `network`, `clash` and `codexImageLinks` results. Inspect the active provider, history count, backup location and existing monitor results. Output omits access tokens, API keys, proxy passwords, controller secrets and complete private subscription URLs. Provider switching, file-opening, network and Clash operations require a trusted workspace.
 
+## Complete source, build and downloads
+
+This repository includes all TypeScript source in `src/`, automated tests in `src/test/`, runtime resources in `resources/`, manual validation tools in `scripts/`, and the dependency lockfile. Download the installable VSIX or the **source + runtime full ZIP** from [GitHub Releases](https://github.com/mapengsen/Agent-Center/releases/latest). The full ZIP also contains the compiled `out/` modules, production `node_modules/`, the VSIX and a source manifest. Generated files are distributed as release assets; development dependencies are installed from the lockfile.
+
+To build from a clean clone, use Node.js 20+ and npm:
+
+```sh
+git clone https://github.com/mapengsen/Agent-Center.git
+cd Agent-Center
+npm ci
+npm run test:unit
+npm run package
+```
+
+Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the full ZIP as well, run `python scripts/build-full-bundle.py` with Python 3.8+ after the working tree is committed. See [the script guide](scripts/README.md) for bundle options and optional live integration tests.
+
 ## Related extension
 
 [Notifyer](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion) is another extension by the same publisher.

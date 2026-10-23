@@ -233,6 +233,22 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 **Agent Center: Show Diagnostics** 会在输出面板显示 `codex`、`codexProvider`、`claude`、`network`、`clash` 和 `codexImageLinks`，用于查看当前服务商、处理的历史数量、备份位置及已有监控结果。输出不包含访问令牌、API Key、代理密码、控制器密钥或完整私密订阅链接。服务商切换、文件补开、联网检测和 Clash 操作需要受信任工作区。
 
+## 完整源码、构建与下载
+
+仓库包含 `src/` 全部 TypeScript 源码、`src/test/` 自动测试、`resources/` 运行资源、`scripts/` 手工验证工具，以及依赖锁文件。[GitHub Releases](https://github.com/mapengsen/Agent-Center/releases/latest) 提供可安装的 VSIX 和 **源码＋运行文件完整 ZIP**；完整 ZIP 还包含编译后的 `out/`、生产依赖 `node_modules/`、VSIX 和源码清单。生成文件随 Release 提供，开发依赖可从锁文件安装。
+
+从全新克隆构建，使用 Node.js 20+ 和 npm：
+
+```sh
+git clone https://github.com/mapengsen/Agent-Center.git
+cd Agent-Center
+npm ci
+npm run test:unit
+npm run package
+```
+
+打包生成 `codex-claude-agent-status-<版本>.vsix`。如需完整 ZIP，在提交工作区后，用 Python 3.8+ 运行 `python scripts/build-full-bundle.py`。可选实机测试和完整包参数见[脚本说明](scripts/README.md)。
+
 ## 相关插件
 
 [Notifyer](https://marketplace.visualstudio.com/items?itemName=pengsen.codex-task-companion) 是同一发布者的另一个扩展。
