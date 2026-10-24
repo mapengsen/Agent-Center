@@ -23,7 +23,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Test and select the best node | Run a fresh batch and select the successful node with the lowest Google latency reachable through the current group's manual selectors. Support nested selectors, verify the effective node and attempt recovery on failure. |
 | Start and stop the proxy | Use native Clash controls in the same hover, verify the controller starts or stops, retain subscriptions and keep the start action available while stopped. |
 | Update the current subscription | Download, force-load and verify the active source, preserving available manual choices. After success, immediately refresh Google connectivity, current-node state and all loaded node delays without selecting a new node. Restore on update failure; updates while stopped keep the service stopped. |
-| Use subscription DNS | Remove conflicting local DNS resolution overrides, keep host DNS enable/listen/IPv6 settings, update the active source and verify the generated DNS policy. Preserve backups, support restoring original DNS overrides and check a complete Google webpage through the current local proxy. Linux/WSL only. |
+| Use subscription DNS | Fetch fresh subscription DNS, falling back to a per-host cache refreshed every five days. Remove conflicting overrides and verify DNS while retaining host listeners, IPv6, nodes and rules. Includes backup, restore and a separate webpage check. Linux/WSL only. |
 | Add, switch and delete subscriptions | Paste a URL to detect its name, save without switching or apply immediately, view the active subscription, and delete any subscription. Deleting the active source switches to the next enabled one; without a replacement, Clash stops. Requires compatible clash-for-linux. |
 | Recover Codex file links | Open supported absolute file links with `code -r`, including images, PDF, SVG, Markdown, CSV, TOML and Office files: **30 default formats**, with a configurable list. Recover failed opens and clean text tabs; preserve unsaved edits and prevent reopen loops. |
 | Remote use, settings and diagnostics | Run in the current local or remote extension host, configure feature switches, credentials and proxies, and inspect quota, connectivity, Clash and file-link diagnostics. |
@@ -42,6 +42,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Claude quota | At startup, three more checks 60 seconds apart, then every **15 minutes**; failed regular checks retry every 30 seconds, up to five attempts per cycle. | Click the quota item or use its refresh command. |
 | VS Code host → Google | At startup, then every **5 hours**, and immediately after a successful subscription update. | Choose “立即检测联网” in the hover card. |
 | Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. Successful subscription updates additionally test all loaded nodes in parallel. | Choose “刷新测速” in the hover card. |
+| Current subscription DNS cache | Cache on discovery, then refresh every **5 days**, checking overdue work after reconnecting. Failed downloads retain prior data and retry at most hourly. Requires the extension to be running. | “DNS 使用订阅配置” always tries a fresh download before falling back to cache. |
 
 ![Agent Center status bar preview](image.png)
 
@@ -181,7 +182,13 @@ Agent Center reads only new entries from the current window's existing `Codex.lo
 
 Choose **DNS 使用订阅配置** in the existing bottom-right Clash hover, or run **Agent Center: Use Subscription DNS**. This is opt-in and applies to the detected clash-for-linux installation. It supports current runtime mixins, host-specific runtime directories and the legacy `resources/mixin.yaml` layout.
 
-The action backs up the active configuration, subscription state and Mixin under the current runtime's `.agent-center-backups/<timestamp>-dns-<id>/`, then removes local DNS resolution overrides such as nameservers, split-DNS policy, fallback and fake-IP settings. Host DNS `enable`, `listen` and `ipv6` remain local; proxy ports, controller credentials, TUN, nodes and rules are retained. Shared fallback mixins are copied into the host runtime rather than edited globally. The current source is updated and its DNS policy is compared with the generated configuration before a running core is force-reloaded. A subscription without a meaningful DNS policy or an unsupported source layout fails with recovery rather than silently clearing local DNS.
+Every click first downloads the current subscription and extracts DNS, with a 15-second total timeout. Download failures, invalid responses or missing DNS fall back to that source's local cache and report its download time. An older-than-five-day cache remains usable offline. Without a valid cache or a successful download, the action reports the problem and leaves configuration untouched.
+
+Background caching starts when clash-for-linux is discovered and refreshes every five days, checking for overdue work during status refreshes and after reconnecting. It keeps old data on failure and retries at most hourly. Background work only saves the cache: it does not apply DNS, update nodes or start/restart Clash. A successful explicit native subscription update also caches its downloaded DNS.
+
+Cache files live in the current Linux/WSL host runtime under `.agent-center-dns-cache/<source-hash>.json`. With Remote SSH this is the remote disk, not Windows. Host runtimes, source IDs, types and URLs are isolated; changing a URL cannot reuse its previous cache. Files contain only DNS resolution policy and download time, without nodes, subscription URLs or controller credentials. Directory/file modes are 700/600. Disabling Clash monitoring, losing workspace trust or disposing the extension cancels background downloads.
+
+The action backs up the active configuration, subscription state and Mixin under the current runtime's `.agent-center-backups/<timestamp>-dns-<id>/`, then removes local DNS resolution overrides such as nameservers, split-DNS policy, fallback and fake-IP settings. Host DNS `enable`, `listen` and `ipv6` remain local; proxy ports, controller credentials, TUN, nodes and rules are retained. Shared fallback mixins are copied into the host runtime rather than edited globally. The downloaded/cached DNS is applied to the current runtime and any existing source file, compared against the resulting policy, and force-loaded into a running core. This does not require the native updater to download nodes/rules, enabling offline DNS recovery without switching subscriptions or reverting nodes. Verification or reload errors restore original files and service state.
 
 The Mixin change persists through native subscription updates and switches. While the policy marker is active, Agent Center start/update actions also remove accidentally reintroduced DNS overrides and verify the result. Reinstallation, manually restoring files or changing the build pipeline may require applying the action again. **恢复原 DNS 覆写** / **Agent Center: Restore Clash DNS Overrides** restores the original DNS resolution overrides while retaining later edits to unrelated settings and host DNS infrastructure. Download, build, verification or reload failures attempt to restore the original files, node selections and on/off state; a stopped proxy stays stopped. Backups contain configuration secrets and use private directory/file permissions.
 
@@ -206,7 +213,7 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 | Agent Center: Start Clash Proxy | Start the current environment's native proxy and verify its loaded configuration. |
 | Agent Center: Stop Clash Proxy | Stop the proxy, verify the controller stops and retain subscriptions. |
 | Agent Center: Update Current Clash Subscription | Refresh the active source while preserving its on/off state; immediately refresh host/current/all-node tests after success and recover on update failure. |
-| Agent Center: Use Subscription DNS | Persist subscription DNS priority, update/verify the active source and report a webpage check through Clash. |
+| Agent Center: Use Subscription DNS | Prefer fresh DNS, fall back to the local cache, persist and verify its policy, and report a webpage check through Clash. |
 | Agent Center: Restore Clash DNS Overrides | Restore backed-up DNS overrides while retaining later unrelated edits and the proxy's on/off state. |
 | Agent Center: Choose Clash Node | Search for and switch a node in a manual selector group. |
 | Agent Center: Add Clash Subscription | Paste a URL, detect its name, then save or switch. |
@@ -256,6 +263,10 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.33 - 2026-10-24
+
+- Cache current subscription DNS on its Linux/WSL host every five days. Manual application prefers fresh DNS and falls back to the matching local cache without downloading nodes/rules. Report cache time and preserve backup, verification, rollback and stopped-state behavior.
 
 ### 0.1.32 - 2026-10-23
 

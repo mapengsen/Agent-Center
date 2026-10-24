@@ -150,6 +150,17 @@ export function verifySubscriptionDns(source: Record<string, unknown>, generated
   }
 }
 
+/** Apply only upstream policy; retain this host's DNS service and all non-DNS configuration. */
+export async function applySubscriptionDns(file: string, sourceFile: string, policy: Record<string, unknown>): Promise<void> {
+  for (const target of new Set([file, sourceFile])) {
+    if (target !== file && !await exists(target)) continue;
+    const document = await readClashDocument(target);
+    const host = record(document.dns) ? Object.fromEntries(Object.entries(document.dns).filter(([key]) => HOST_DNS_KEYS.has(key))) : {};
+    document.dns = { ...structuredClone(policy), ...host };
+    await writePrivate(target, dump(document, { lineWidth: -1 }));
+  }
+}
+
 /** Restore can retain original local DNS policy; check that it survived build. */
 export async function verifyRestoredDns(root: string, runtime: string, legacy: boolean, generated: Record<string, unknown>): Promise<void> {
   let target = path.join(runtime, "mixin.yaml");

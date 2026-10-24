@@ -12,6 +12,7 @@ import { ClashSubscriptions } from "../clashSubscriptions";
 import { dnsPolicy, prepareDnsChange, removeDnsOverrides, subscriptionDnsEnabled, verifySubscriptionDns } from "../clashDns";
 import { readClashDocument, snapshotClashFiles, controllerListening } from "../clashRuntime";
 import type { ClashWebProbe } from "../clashWebProbe";
+import { ClashDnsCache, DNS_CACHE_INTERVAL_MS, type DnsDownloader } from "../clashDnsCache";
 
 const badDns = { enable: true, listen: "127.0.0.1:1053", ipv6: false, nameserver: ["114.114.114.114"], "enhanced-mode": "redir-host" };
 const goodDns = { enable: true, nameserver: ["https://resolver.example/dns-query"], "nameserver-policy": { "+.example.com": ["https://split.example/dns-query"] }, "enhanced-mode": "fake-ip", "use-hosts": false };
@@ -45,11 +46,15 @@ async function fixture(t: TestContext, options: { legacy?: boolean; perHost?: bo
   else await fs.writeFile(path.join(runtime, "subscriptions.yaml"), JSON.stringify({ active: "current", sources: { current: { enabled: true, type: "clash", url: "https://private.example/source-token" } } }));
   let source: Record<string, unknown> = { dns: structuredClone(goodDns) };
   let forceBad = false, failDownload = false, probeCount = 0, online = false, port = 0;
+  const calls: string[] = [];
   const sourceFile = legacy ? path.join(runtime, "config.yaml") : path.join(runtime, "tmp/source-current.yaml");
   const app = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/configs") return res.end('{"mode":"rule"}');
     if (req.method === "GET" && req.url === "/proxies") return res.end('{"proxies":{"node":{"type":"Shadowsocks"},"PROXY":{"type":"Selector","all":["node"],"now":"node"}}}');
-    if (req.method === "PUT" && req.url === "/configs?force=true") return res.writeHead(204).end();
+    if (req.method === "PUT" && req.url === "/configs?force=true") {
+      if (forceBad) { forceBad = false; return res.writeHead(500).end(); }
+      return res.writeHead(204).end();
+    }
     res.writeHead(404).end();
   });
   const start = async () => { if (!online) { await new Promise<void>((r) => app.listen(port, "127.0.0.1", r)); port = (app.address() as { port: number }).port; online = true; } };
@@ -57,6 +62,7 @@ async function fixture(t: TestContext, options: { legacy?: boolean; perHost?: bo
   t.after(stop); await start();
   const connection = { controller: `http://127.0.0.1:${port}`, secret: "private-controller", timeoutMs: 500, configPath: file, preferredGroups: ["PROXY"] };
   const runner = async (action: "start" | "stop" | "update") => {
+    calls.push(action);
     if (action === "stop") return stop();
     if (action === "start") return start();
     if (failDownload) throw new Error("download failed: https://private.example/source-token");
@@ -73,8 +79,12 @@ async function fixture(t: TestContext, options: { legacy?: boolean; perHost?: bo
       dns: forceBad ? badDns : merge(source.dns ?? {}, overrides.dns ?? {}) }));
   };
   let web: ClashWebProbe = { status: "success", detail: "Google webpage downloaded", httpStatus: 200 };
-  const control = new ClashControl(root, runtime, file, runner, legacy ? undefined : new ClashSubscriptions(root, undefined, runtime), async () => { probeCount++; return web; });
-  return { root, runtime, file, mixinFile, sourceFile, connection, control, stop, probeCount: () => probeCount,
+  const cache = new ClashDnsCache(root, runtime, legacy, async () => {
+    if (failDownload) throw new Error("https://private.example/source-token");
+    return structuredClone(source);
+  });
+  const control = new ClashControl(root, runtime, file, runner, legacy ? undefined : new ClashSubscriptions(root, undefined, runtime), async () => { probeCount++; return web; }, cache);
+  return { root, runtime, file, mixinFile, sourceFile, connection, control, cache, calls, stop, probeCount: () => probeCount,
     source: (value: Record<string, unknown>) => { source = value; }, bad: () => { forceBad = true; }, fail: () => { failDownload = true; },
     web: (value: ClashWebProbe) => { web = value; } };
 }
@@ -144,15 +154,15 @@ test("restoring split DNS respects native deep merge while retaining new subscri
   assert.deepEqual(restored["nameserver-policy"]["+.example.com"], goodDns["nameserver-policy"]["+.example.com"]);
 });
 
-for (const failure of ["download", "missing-dns", "wrong-dns"] as const) {
+for (const failure of ["download", "missing-dns", "reload"] as const) {
   test(`DNS ${failure} failure rolls back mixin, marker, runtime and running state without leaking URLs`, async (t) => {
     const h = await fixture(t);
     const mixin = await fs.readFile(h.mixinFile), runtime = await fs.readFile(h.file);
     if (failure === "download") h.fail();
     if (failure === "missing-dns") h.source({});
-    if (failure === "wrong-dns") h.bad();
+    if (failure === "reload") h.bad();
     await assert.rejects(h.control.execute("subscription-dns", h.connection), (error: Error) => {
-      assert.match(error.message, /已恢复原配置/);
+      assert.match(error.message, /已恢复原配置|没有当前订阅的有效缓存/);
       assert.doesNotMatch(error.message, /private.example|source-token|private-controller/);
       return true;
     });
@@ -173,6 +183,132 @@ test("DNS changes while stopped preserve the stopped state; no backup can be res
   assert.equal(result.dns?.web.status, "skipped");
   assert.equal(await controllerListening(h.connection.controller), false);
   assert.equal(h.probeCount(), 0);
+});
+
+for (const legacy of [false, true]) {
+  test(`${legacy ? "legacy" : "native"} offline DNS recovery uses the current source cache without running the native updater or changing nodes`, async (t) => {
+    const h = await fixture(t, { legacy });
+    // Cache is populated in advance, before the user's DNS/network failure.
+    await h.control.refreshDnsCache();
+    const before = await readClashDocument(h.file);
+    const sources = legacy ? await fs.readFile(path.join(h.root, ".env")) : await fs.readFile(path.join(h.runtime, "subscriptions.yaml"));
+    h.fail();
+    const result = await h.control.execute("subscription-dns", h.connection);
+    assert.equal(result.dns?.fromCache, true);
+    assert.ok(result.dns?.downloadedAt);
+    assert.deepEqual(h.calls, []);
+    const after = await readClashDocument(h.file);
+    assert.deepEqual(dnsPolicy(after.dns), dnsPolicy(goodDns));
+    for (const key of Object.keys(before).filter((key) => key !== "dns")) assert.deepEqual(after[key], before[key]);
+    assert.deepEqual(legacy ? await fs.readFile(path.join(h.root, ".env")) : await fs.readFile(path.join(h.runtime, "subscriptions.yaml")), sources);
+    assert.equal(await subscriptionDnsEnabled(h.runtime), true);
+    assert.equal(await controllerListening(h.connection.controller), true);
+  });
+}
+
+test("manual DNS application prefers a fresh policy and rolls back a failed offline reload", async (t) => {
+  const h = await fixture(t);
+  await h.control.refreshDnsCache();
+  const newer = { ...goodDns, nameserver: ["https://new.example/dns-query"] };
+  h.source({ dns: newer });
+  const result = await h.control.execute("subscription-dns", h.connection);
+  assert.equal(result.dns?.fromCache, false);
+  assert.deepEqual(dnsPolicy((await readClashDocument(h.file)).dns), dnsPolicy(newer));
+  const files = [h.file, h.mixinFile, path.join(h.runtime, ".agent-center-dns-policy.json")];
+  const before = await Promise.all(files.map((file) => fs.readFile(file)));
+  h.fail(); h.bad();
+  await assert.rejects(h.control.execute("subscription-dns", h.connection), /已恢复原配置/);
+  assert.deepEqual(await Promise.all(files.map((file) => fs.readFile(file))), before);
+  assert.deepEqual(h.calls, []);
+});
+
+async function cacheFixture(t: TestContext, download?: DnsDownloader) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-center-dns-cache-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const runtime = path.join(root, "runtime");
+  await fs.mkdir(runtime);
+  const subscriptions = path.join(runtime, "subscriptions.yaml");
+  const setSource = (url = "https://private.example/source-token", name = "current") => fs.writeFile(subscriptions, JSON.stringify({ active: name, sources: { [name]: { url, enabled: true, type: "clash" } } }));
+  await setSource();
+  let now = Date.parse("2026-10-24T00:00:00Z"), calls = 0, fails = false;
+  const cache = new ClashDnsCache(root, runtime, false, download ?? (async () => {
+    calls++;
+    if (fails) throw new Error("https://private.example/source-token");
+    return { dns: goodDns, proxies: [{ password: "not-for-the-cache" }], secret: "not-for-the-cache" };
+  }), () => now);
+  return { root, runtime, cache, setSource, calls: () => calls, advance: (ms: number) => { now += ms; }, fail: () => { fails = true; } };
+}
+
+test("background caching refreshes after five days, retains old DNS on failures and limits retries to hourly", async (t) => {
+  const h = await cacheFixture(t);
+  await h.cache.refresh(); assert.equal(h.calls(), 1);
+  h.advance(DNS_CACHE_INTERVAL_MS - 1);
+  await h.cache.refresh(); assert.equal(h.calls(), 1);
+  h.advance(1);
+  await h.cache.refresh(); assert.equal(h.calls(), 2);
+  const file = path.join(h.runtime, ".agent-center-dns-cache", (await fs.readdir(path.join(h.runtime, ".agent-center-dns-cache")))[0]);
+  const before = await fs.readFile(file, "utf8");
+  assert.doesNotMatch(before, /source-token|private.example|not-for-the-cache|proxies|listen/);
+  if (process.platform !== "win32") {
+    assert.equal((await fs.stat(file)).mode & 0o777, 0o600);
+    assert.equal((await fs.stat(path.dirname(file))).mode & 0o777, 0o700);
+  }
+  h.advance(6 * DNS_CACHE_INTERVAL_MS); h.fail();
+  await assert.rejects(h.cache.refresh()); assert.equal(h.calls(), 3);
+  await h.cache.refresh(); assert.equal(h.calls(), 3);
+  h.advance(3600000);
+  await assert.rejects(h.cache.refresh()); assert.equal(h.calls(), 4);
+  assert.equal(await fs.readFile(file, "utf8"), before);
+  const fallback = await h.cache.resolve();
+  assert.equal(fallback.fromCache, true);
+  assert.deepEqual(fallback.dns, dnsPolicy(goodDns));
+});
+
+test("cache identities bind to the active subscription and its URL; malformed caches and invalid DNS cannot be applied", async (t) => {
+  const h = await cacheFixture(t);
+  await h.cache.refresh(); h.fail();
+  await h.setSource("https://changed.example/new-token");
+  await assert.rejects(h.cache.resolve(), /没有当前订阅的有效缓存/);
+  await h.setSource("https://private.example/source-token", "other");
+  await assert.rejects(h.cache.resolve(), /没有当前订阅的有效缓存/);
+  await h.setSource();
+  const directory = path.join(h.runtime, ".agent-center-dns-cache");
+  const file = path.join(directory, (await fs.readdir(directory))[0]);
+  await fs.writeFile(file, "corrupt");
+  await assert.rejects(h.cache.resolve(), (error: Error) => !/private.example|source-token/.test(error.message));
+  const invalid = await cacheFixture(t, async () => ({ dns: { enable: true } }));
+  await assert.rejects(invalid.cache.resolve(), /没有当前订阅的有效缓存/);
+});
+
+test("background downloads abort on shutdown and cannot be saved for a different active source", async (t) => {
+  const abort = new AbortController();
+  const h = await cacheFixture(t, async (_url, signal) => { abort.abort(); signal?.throwIfAborted(); return { dns: goodDns }; });
+  await assert.rejects(h.cache.refresh(abort.signal));
+  await assert.rejects(fs.access(path.join(h.runtime, ".agent-center-dns-cache")));
+  const changed = await cacheFixture(t, async () => { await changed.setSource("https://different.example/token"); return { dns: goodDns }; });
+  await assert.rejects(changed.cache.resolve(), /订阅已改变/);
+  await assert.rejects(fs.access(path.join(changed.runtime, ".agent-center-dns-cache")));
+});
+
+test("the real downloader fetches YAML without authentication, caches only DNS, and falls back on HTTP errors", async (t) => {
+  const h = await cacheFixture(t);
+  let status = 200;
+  const server = http.createServer((req, res) => {
+    assert.equal(req.method, "GET");
+    assert.equal(req.headers.authorization, undefined);
+    res.writeHead(status).end(dump({ dns: goodDns, proxies: [{ name: "private-node", password: "not-cached" }] }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  await h.setSource(`http://127.0.0.1:${(server.address() as { port: number }).port}/private-subscription`);
+  const cache = new ClashDnsCache(h.root, h.runtime, false);
+  const fresh = await cache.resolve();
+  assert.equal(fresh.fromCache, false);
+  assert.deepEqual(fresh.dns, dnsPolicy(goodDns));
+  status = 503;
+  const cached = await cache.resolve();
+  assert.equal(cached.fromCache, true);
+  assert.equal(cached.downloadedAt, fresh.downloadedAt);
 });
 
 test("a failed webpage probe is reported separately from a verified DNS configuration", async (t) => {

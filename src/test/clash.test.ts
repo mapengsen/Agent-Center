@@ -164,6 +164,7 @@ async function monitorHarness(t: TestContext) {
   const controlCalls: string[] = [];
   const control = {
     configPath: "/test/config.yaml",
+    refreshDnsCache: async (_signal?: AbortSignal) => {},
     execute: async (action: string) => {
       controlCalls.push(action);
       if (action === "start") running = true;
@@ -261,6 +262,26 @@ test("status-bar click opens the existing native hover with trusted actions and 
   assert.equal(h.shownPicks.length, 0);
   assert.deepEqual(h.notices, []);
   assert.deepEqual(h.commands, []);
+});
+
+test("background DNS caching runs even with a stopped controller and is aborted when disabled", async (t) => {
+  const h = await monitorHarness(t);
+  await h.monitor.manageControl("stop");
+  let signal: AbortSignal | undefined;
+  let ready!: () => void;
+  const started = new Promise<void>((resolve) => { ready = resolve; });
+  h.control.refreshDnsCache = async (value) => {
+    signal = value;
+    ready();
+    await new Promise<void>((resolve) => value!.addEventListener("abort", () => resolve(), { once: true }));
+  };
+  await h.monitor.refresh(); await started;
+  assert.equal(h.monitor.getDiagnostics().proxyStopped, true);
+  assert.equal(h.errors.length, 0);
+  h.config.enabled = false; h.monitor.reloadConfiguration();
+  assert.equal(signal?.aborted, true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.shown(), false);
 });
 
 test("all-node testing uses the hover, labels each result and preserves the current selection", async (t) => {

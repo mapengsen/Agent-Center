@@ -5,14 +5,15 @@ import { ClashApiClient } from "./clashApi";
 import type { ClashConnection } from "./clashConfig";
 import { discoverClashSubscriptions, runSubscriptionCommand, runClashBash, validateSubscriptionName, type ClashSubscriptions } from "./clashSubscriptions";
 import { withClashLock, controllerListening, waitClashStopped, loadAndVerifyClashConfig, restoreClashSelections, snapshotClashFiles, restoreClashFiles, readClashDocument } from "./clashRuntime";
-import { prepareDnsChange, subscriptionDnsEnabled, verifySubscriptionDns, verifyRestoredDns } from "./clashDns";
+import { applySubscriptionDns, prepareDnsChange, subscriptionDnsEnabled, verifySubscriptionDns, verifyRestoredDns } from "./clashDns";
+import { ClashDnsCache } from "./clashDnsCache";
 import { probeClashGoogle, type ClashWebProbe } from "./clashWebProbe";
 
 export type ClashControlAction = "start" | "stop" | "update" | "subscription-dns" | "restore-dns";
 export type ClashControlRunner = (action: "start" | "stop" | "update") => Promise<void>;
 export interface ClashControlResult {
   running: boolean;
-  dns?: { mode: "subscription" | "local"; backupDirectory: string; web: ClashWebProbe };
+  dns?: { mode: "subscription" | "local"; backupDirectory: string; web: ClashWebProbe; fromCache?: boolean; downloadedAt?: string };
 }
 
 export class ClashControl {
@@ -21,7 +22,10 @@ export class ClashControl {
     public readonly configPath: string, private readonly run: ClashControlRunner,
     private readonly subscriptions?: ClashSubscriptions,
     private readonly webProbe: typeof probeClashGoogle = probeClashGoogle,
+    private readonly dnsCache = new ClashDnsCache(root, runtimeDirectory, !subscriptions),
   ) {}
+
+  public refreshDnsCache(signal?: AbortSignal): Promise<void> { return this.dnsCache.refresh(signal); }
 
   public async execute(action: ClashControlAction, connection: ClashConnection): Promise<ClashControlResult> {
     return withClashLock(this.runtimeDirectory, async () => {
@@ -47,6 +51,7 @@ export class ClashControl {
       const stateFile = path.join(this.runtimeDirectory, "subscriptions.yaml");
       const beforeSources = this.subscriptions ? await readClashDocument(stateFile) : undefined;
       const legacy = !this.subscriptions;
+      const cachedDns = action === "subscription-dns" ? await this.dnsCache.resolve() : undefined;
       const dns = dnsAction || followDns ? await prepareDnsChange(this.root, this.runtimeDirectory, legacy, action === "restore-dns") : undefined;
       const sourceFile = legacy ? path.join(this.runtimeDirectory, "config.yaml") : path.join(this.runtimeDirectory, "tmp", `source-${active}.yaml`);
       const files = await snapshotClashFiles([
@@ -56,33 +61,40 @@ export class ClashControl {
       ]);
       try {
         if (dns) await dns.apply(files);
-        // DNS changes also update the active source; no URL is fetched by the extension.
-        await this.run(dnsAction ? "update" : action);
+        // DNS recovery must not depend on the native updater downloading nodes or rules.
+        if (cachedDns) await applySubscriptionDns(this.configPath, sourceFile, cachedDns.dns);
+        else await this.run(dnsAction ? "update" : action);
         const generated = await readClashDocument(this.configPath);
-        if (followDns) verifySubscriptionDns(await readClashDocument(sourceFile), generated);
+        if (followDns) verifySubscriptionDns(cachedDns ? { dns: cachedDns.dns } : await readClashDocument(sourceFile), generated);
         if (action === "restore-dns") await verifyRestoredDns(this.root, this.runtimeDirectory, legacy, generated);
         if (beforeSources) {
           const after = await readClashDocument(stateFile);
           if (after.active !== beforeSources.active || canonical(after.sources) !== canonical(beforeSources.sources)) throw new Error("更新意外改变了订阅列表。");
+        }
+        if (action === "update") {
+          try { await this.dnsCache.remember((await readClashDocument(sourceFile)).dns); }
+          catch { /* Optional caching must not turn a successful native update into a failure. */ }
         }
         if (action === "start" || wasRunning) {
           await loadAndVerifyClashConfig(connection, this.configPath);
           if (previous) await restoreClashSelections(connection, previous);
           if (dnsAction) await new ClashApiClient(connection).flushDnsCache();
           return { running: true, ...(dnsAction && dns ? { dns: { mode: action === "restore-dns" ? "local" as const : "subscription" as const,
-            backupDirectory: dns.backupDirectory, web: await this.webProbe(generated) } } : {}) };
+            backupDirectory: dns.backupDirectory, web: await this.webProbe(generated),
+            ...(cachedDns ? { fromCache: cachedDns.fromCache, downloadedAt: cachedDns.downloadedAt } : {}) } } : {}) };
         }
         // Preserve a stopped service while allowing its subscription to update.
         if (await controllerListening(connection.controller)) await this.run("stop");
         await waitClashStopped(connection);
         return { running: false, ...(dnsAction && dns ? { dns: { mode: action === "restore-dns" ? "local" as const : "subscription" as const,
-          backupDirectory: dns.backupDirectory, web: { status: "skipped" as const, detail: "代理保持关闭，未检测网页。" } } } : {}) };
+          backupDirectory: dns.backupDirectory, web: { status: "skipped" as const, detail: "代理保持关闭，未检测网页。" },
+          ...(cachedDns ? { fromCache: cachedDns.fromCache, downloadedAt: cachedDns.downloadedAt } : {}) } } : {}) };
       } catch (error) {
         let restored = false;
         try {
           await restoreClashFiles(files);
           if (wasRunning) {
-            await this.run("start");
+            if (!await controllerListening(connection.controller)) await this.run("start");
             // Starting can regenerate files; restore again before loading the snapshot.
             await restoreClashFiles(files);
             await loadAndVerifyClashConfig(connection, this.configPath);

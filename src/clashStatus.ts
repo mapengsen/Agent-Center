@@ -35,6 +35,8 @@ export class ClashStatusMonitor implements vscode.Disposable {
   private nodeTests: (ClashNodeTests & { context: string }) | undefined;
   private nodeTestAbort: AbortController | undefined;
   private nodeTestPending: Promise<void> | undefined;
+  private dnsCachePending: Promise<void> | undefined;
+  private dnsCacheAbort: AbortController | undefined;
 
   public constructor(private readonly refreshNetworkAfterUpdate: () => Promise<void> = async () => {}) {
     this.statusBar = vscode.window.createStatusBarItem("agentStatus.clash", vscode.StatusBarAlignment.Right, 70);
@@ -68,6 +70,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
     }
     try {
       const connection = await loadClashConnection(settings);
+      if (this.active(generation) && connection.configPath) this.refreshDnsCache(connection.configPath, settings.installDirectory ?? "", generation);
       discovered = Boolean(connection.configPath || settings.controller || settings.secret);
       let subscription: string | undefined;
       this.noActiveSubscription = false;
@@ -282,7 +285,9 @@ export class ClashStatusMonitor implements vscode.Disposable {
       if (!result.running) this.renderStopped();
       if (result.dns) {
         this.dnsVerification = { checkedAt: new Date().toLocaleString(), result: result.dns.web, backupDirectory: result.dns.backupDirectory };
-        const text = (result.dns.mode === "subscription" ? "DNS 已使用订阅配置并核验。" : "原 DNS 覆写已恢复。") + result.dns.web.detail + " 备份：" + result.dns.backupDirectory;
+        const source = result.dns.downloadedAt ? (result.dns.fromCache ? "订阅下载失败，已使用本机缓存：" : "已下载最新订阅 DNS：") + result.dns.downloadedAt + "。" : "";
+        this.dnsVerification.result = { ...result.dns.web, detail: source + result.dns.web.detail };
+        const text = (result.dns.mode === "subscription" ? "DNS 已使用订阅配置并核验。" : "原 DNS 覆写已恢复。") + source + result.dns.web.detail + " 备份：" + result.dns.backupDirectory;
         if (result.dns.web.status === "failed") void vscode.window.showWarningMessage(text);
         else void vscode.window.showInformationMessage(text);
       } else void vscode.window.showInformationMessage(action === "update"
@@ -471,6 +476,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
 
   public reloadConfiguration(): void {
     this.cancelNodeTests();
+    this.dnsCacheAbort?.abort();
     this.generation++;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
@@ -488,6 +494,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
     void (async () => {
       await this.pending;
       await this.nodeTestPending;
+      await this.dnsCachePending;
       if (!this.active(generation)) return;
       await this.refresh();
       this.schedule(generation);
@@ -511,6 +518,7 @@ export class ClashStatusMonitor implements vscode.Disposable {
 
   public dispose(): void {
     this.cancelNodeTests();
+    this.dnsCacheAbort?.abort();
     this.disposed = true;
     this.generation++;
     if (this.timer) clearTimeout(this.timer);
@@ -519,6 +527,21 @@ export class ClashStatusMonitor implements vscode.Disposable {
 
   private active(generation: number): boolean {
     return !this.disposed && generation === this.generation && enabled() && vscode.workspace.isTrusted;
+  }
+
+  private refreshDnsCache(configPath: string, installDirectory: string, generation: number): void {
+    if (this.dnsCachePending) return;
+    const abort = new AbortController();
+    this.dnsCacheAbort = abort;
+    this.dnsCachePending = (async () => {
+      try {
+        const control = await discoverClashControl(configPath, installDirectory);
+        if (this.active(generation) && !abort.signal.aborted) await control.refreshDnsCache(abort.signal);
+      } catch { /* Keep prior cache on failure; never expose provider URLs or native errors. */ }
+    })().finally(() => {
+      if (this.dnsCacheAbort === abort) this.dnsCacheAbort = undefined;
+      this.dnsCachePending = undefined;
+    });
   }
 
   private schedule(generation: number): void {

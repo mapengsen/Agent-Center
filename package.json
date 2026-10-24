@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex/Claude quotas, Codex provider switching with shared history, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",

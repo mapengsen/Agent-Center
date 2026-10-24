@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.33 - 2026-10-24
+
+### Added / 新增
+
+- Cache current subscription DNS on the Linux/WSL extension host on discovery and every five days. Background work only saves DNS policy, uses private files isolated by runtime and source identity, retains stale data offline and limits failed refresh retries to hourly.
+- 当前订阅 DNS 首次识别时及每 5 天缓存到所在 Linux/WSL 主机；后台仅缓存，按运行目录和订阅身份隔离，使用私有权限，离线保留旧数据，失败最多每小时重试一次。
+- Manual subscription-DNS recovery tries a fresh 15-second download before using the matching cache. Apply DNS without depending on native node/rule downloads; retain nodes, rules, host DNS listeners, backups, verification, rollback and service state, and report cache download time.
+- 手动应用优先尝试下载（15 秒），失败使用匹配缓存；无需原生更新下载节点或规则即可恢复 DNS，保留节点、规则、本机 DNS 监听、备份、核验、失败恢复和代理开关，显示缓存下载时间。
+
 ## 0.1.32 - 2026-10-23
 
 ### Changed / 变更
