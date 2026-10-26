@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "Codex/Claude quotas, Codex provider switching with shared history, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.33",
+  "description": "Codex/Claude quotas, provider switching, live NVIDIA GPU hover, Google connectivity, Clash controls and file-link recovery.",
+  "version": "0.1.34",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -34,7 +34,9 @@
     "multi-agent",
     "status bar",
     "clash",
-    "mihomo"
+    "mihomo",
+    "nvidia",
+    "gpu"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
@@ -51,6 +53,9 @@
       }
     },
     "commands": [
+      { "command": "agentStatus.showGpuMonitor", "title": "Agent Center: Start NVIDIA GPU Monitor" },
+      { "command": "agentStatus.pauseGpuMonitor", "title": "Agent Center: Pause NVIDIA GPU Monitor" },
+      { "command": "agentStatus.refreshGpuMonitor", "title": "Agent Center: Refresh NVIDIA GPU Once" },
       {
         "command": "agentStatus.switchCodexProvider",
         "title": "Agent Center: Switch Codex Provider"
@@ -143,6 +148,14 @@
     "configuration": {
       "title": "Agent Center",
       "properties": {
+        "agentStatus.gpu.enabled": {
+          "type": "boolean", "default": true,
+          "description": "在右下角显示 GPU 按钮。点击后在原生悬浮卡片每秒更新当前扩展宿主的 nvidia-smi 输出；暂停、关闭功能或关闭窗口时停止。Remote SSH 中读取远程主机。"
+        },
+        "agentStatus.gpu.nvidiaSmiPath": {
+          "type": "string", "default": "", "scope": "machine-overridable",
+          "description": "当前扩展宿主的 nvidia-smi 可执行文件路径，不是整条 shell 命令；支持 ~/。留空从 PATH 查找，Windows 还检查常见驱动目录。"
+        },
         "agentStatus.codexImageLinks.enabled": {
           "type": "boolean",
           "default": true,
@@ -358,7 +371,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js out/test/clashNodeTests.test.js out/test/clashBestNode.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js out/test/clashNodeTests.test.js out/test/clashBestNode.test.js out/test/gpu.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },

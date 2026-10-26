@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## 0.1.34 - 2026-10-26
+
+### Added / 新增
+
+- Add a bottom-right GPU button with a native live `nvidia-smi` table. Start on click, sample one second after each completed read, preserve columns with scrolling, and provide pause/resume and single-refresh controls.
+- 新增右下角 GPU 按钮，在原生悬浮卡片显示完整 `nvidia-smi` 表格；点击后启动，每轮读取完成 1 秒后再刷新，保留列宽并支持滚动，提供暂停、继续和单次刷新。
+- Execute on the current local/remote extension host, with PATH/custom executable discovery and Windows driver-directory fallbacks. Avoid shells and persistent watch processes; enforce timeout/output limits, cancellation, trust and non-overlapping commands. Closing the card keeps sampling; pause, disable or close the window to stop.
+- 在当前本地/远程扩展宿主执行，支持 PATH、自定义工具路径和 Windows 常见驱动目录；不运行 shell 或常驻 watch，提供超时、输出限制、取消、工作区信任和非并发保护。收起卡片后继续采样，暂停、关闭功能或窗口时停止。
+
 ## 0.1.33 - 2026-10-24
 
 ### Added / 新增

@@ -2,7 +2,7 @@
 
 Language: <a href="https://github.com/mapengsen/Agent-Center/tree/main">English (default)</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center puts Codex and Claude usage quotas, Codex provider switching with shared history, VS Code internet connectivity, and Clash/Mihomo controls in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
+Agent Center puts Codex and Claude usage quotas, Codex provider switching with shared history, live NVIDIA GPU monitoring, VS Code internet connectivity, and Clash/Mihomo controls in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -16,6 +16,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Codex usage quotas | See remaining or used percentages, short/long windows, reset times, account email and plan in the status bar and hover. |
 | Claude usage quotas | Inspect 5-hour, 7-day, Opus and Sonnet windows when returned by the service, plus subscription and reset details. |
 | Quota display and refresh | Choose remaining/used mode for each provider, see colored usage markers, click to refresh, and use automatic refresh with failure retries. |
+| Live NVIDIA GPU monitor | Click GPU for a native floating card with the complete `nvidia-smi` table: devices, memory, utilization, temperature, power and processes. Sample every second, pause/resume or refresh once. Remote SSH queries the remote host. |
 | VS Code internet connectivity | Request only Google's public website from the extension host. Any HTTP response shows `✅️`; no response shows `❌`. The single icon sits before the Clash globe. Checks run at startup and every **5 hours**, with manual checks available. |
 | Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
@@ -43,10 +44,19 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | VS Code host → Google | At startup, then every **5 hours**, and immediately after a successful subscription update. | Choose “立即检测联网” in the hover card. |
 | Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. Successful subscription updates additionally test all loaded nodes in parallel. | Choose “刷新测速” in the hover card. |
 | Current subscription DNS cache | Cache on discovery, then refresh every **5 days**, checking overdue work after reconnecting. Failed downloads retain prior data and retry at most hourly. Requires the extension to be running. | “DNS 使用订阅配置” always tries a fresh download before falling back to cache. |
+| NVIDIA GPU monitor | Start on click; sample **1 second after each completed read**, without overlapping commands. No sampling on window startup. | Pause/resume and refresh-once links at the top of the GPU hover. |
 
 ![Agent Center status bar preview](image.png)
 
 The image shows the quota items. A combined connectivity and Clash example is `✅️ 🌐 √ Google（1605 ms）`: the leading icon is the extension-host check, and the latency is the independent Clash node test.
+
+## Live NVIDIA GPU monitoring
+
+Click the separate bottom-right **GPU** button to open a native floating hover above the status item. See the machine hostname and complete original `nvidia-smi` table, with the effect of `watch -n 1 nvidia-smi`. Fixed-width columns are retained; scroll horizontally for wide tables and vertically for long process lists. Controls remain at the top. This is read-only and opens no terminal or editor.
+
+Sampling starts on click. **暂停监控** stops future reads, cancels a running command and retains the last frame. Click GPU again or **继续 / 重试** to resume. **刷新一次** reads one sample without restarting a paused watch. **Agent Center: Start NVIDIA GPU Monitor** also starts sampling; click GPU to view its hover. VS Code exposes no public close event for this native status-bar hover, so closing the card does not pause sampling. Use pause; disabling the feature, losing workspace trust or closing the window also stops it. A five-second timeout, driver/executable errors or invalid output pause the watch and show a retry action.
+
+Local windows query the local machine; Remote SSH, WSL and containers query their current extension host. Install Agent Center there, with a working NVIDIA driver and `nvidia-smi`; containers need GPU access. Default discovery uses PATH, plus common NVIDIA driver paths on Windows. Set `agentStatus.gpu.nvidiaSmiPath` to an executable path (supports `~/`, not a full shell command), or use `agentStatus.gpu.enabled` to hide the button and stop monitoring. Requires a trusted workspace. Output stays in memory and the hover; the `gpu` diagnostics field contains state/timestamps without the full process list.
 
 ## Codex provider switching and shared history
 
@@ -200,6 +210,9 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 
 | Command | Purpose |
 | --- | --- |
+| Agent Center: Start NVIDIA GPU Monitor | Start/resume one-second sampling; click GPU to view the native hover. |
+| Agent Center: Pause NVIDIA GPU Monitor | Stop sampling and retain the last frame. |
+| Agent Center: Refresh NVIDIA GPU Once | Read one sample without restarting a paused watch. |
 | Agent Center: Switch Codex Provider | Choose official ChatGPT or enter an API ID; share all indexed local history with the selected provider. |
 | Agent Center: Refresh Codex Usage | Refresh the current environment's Codex quota. |
 | Agent Center: Choose Codex Usage Display | Choose remaining or used percentage for Codex. |
@@ -229,6 +242,7 @@ Search for **Agent Center** in Settings, or run **Agent Center: Open Settings**.
 
 | Settings group | Enable/disable | Other options |
 | --- | --- | --- |
+| NVIDIA GPU monitor | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
 | Codex provider switching | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex quota | `agentStatus.codex.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
 | Claude quota | `agentStatus.claude.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
@@ -263,6 +277,10 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.34 - 2026-10-26
+
+- Add a GPU button and native live `nvidia-smi` hover, with one-second sampling, pause/resume, single refresh, remote execution, custom executable path, timeout and cancellation.
 
 ### 0.1.33 - 2026-10-24
 

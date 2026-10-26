@@ -5,6 +5,7 @@ import { CodexImageLinkMonitor } from "./codexImageLinks";
 import { ClashStatusMonitor } from "./clashStatus";
 import { NetworkStatusMonitor } from "./networkStatus";
 import { CodexProviderSwitcher } from "./codexProvider";
+import { GpuStatusMonitor } from "./gpuStatus";
 
 export function activate(context: vscode.ExtensionContext): void {
   const codexUsage = new CodexUsageMonitor();
@@ -14,6 +15,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const networkStatus = new NetworkStatusMonitor((status) => clashStatus.setNetworkStatus(status));
   const diagnostics = vscode.window.createOutputChannel("Agent Center");
   const codexProvider = new CodexProviderSwitcher(context);
+  const gpu = new GpuStatusMonitor();
 
   context.subscriptions.push(
     codexUsage,
@@ -23,6 +25,10 @@ export function activate(context: vscode.ExtensionContext): void {
     networkStatus,
     diagnostics,
     codexProvider,
+    gpu,
+    vscode.commands.registerCommand("agentStatus.showGpuMonitor", () => gpu.show()),
+    vscode.commands.registerCommand("agentStatus.pauseGpuMonitor", () => gpu.pause()),
+    vscode.commands.registerCommand("agentStatus.refreshGpuMonitor", () => gpu.refresh()),
     vscode.commands.registerCommand("agentStatus.switchCodexProvider", () => codexProvider.choose()),
     vscode.commands.registerCommand("agentStatus.refreshCodexUsage", () => codexUsage.refresh("manual")),
     vscode.commands.registerCommand("agentStatus.restartCodexImageLinks", () => codexImageLinks.restart()),
@@ -63,10 +69,12 @@ export function activate(context: vscode.ExtensionContext): void {
         clash: clashStatus.getDiagnostics(),
         network: networkStatus.getDiagnostics(),
         codexImageLinks: codexImageLinks.getDiagnostics(),
+        gpu: gpu.getDiagnostics(),
       }, null, 2));
       diagnostics.show(true);
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("agentStatus.gpu")) gpu.reloadConfiguration();
       if (event.affectsConfiguration("agentStatus.codexProvider")) void codexProvider.refresh();
       if (event.affectsConfiguration("agentStatus.codexImageLinks") ||
           event.affectsConfiguration("codexImageOpener.enabled")) {
@@ -112,6 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
       void codexImageLinks.restart();
       clashStatus.reloadConfiguration();
       networkStatus.reloadConfiguration();
+      gpu.reloadConfiguration();
     }),
     vscode.extensions.onDidChange(() => { void codexImageLinks.restart(); }),
   );
@@ -122,6 +131,7 @@ export function activate(context: vscode.ExtensionContext): void {
   void codexImageLinks.restart();
   clashStatus.start();
   networkStatus.start();
+  gpu.start();
 }
 
 export function deactivate(): void {

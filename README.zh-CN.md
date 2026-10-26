@@ -2,7 +2,7 @@
 
 语言：<a href="https://github.com/mapengsen/Agent-Center/tree/main">English（默认）</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共用、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
+Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共用、NVIDIA GPU 监控、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -16,6 +16,7 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | Codex 使用额度 | 查看剩余或已使用百分比、短窗口与长窗口、重置时间，以及账户邮箱和套餐。 |
 | Claude 使用额度 | 查看接口返回的 5 小时、7 天、Opus、Sonnet 额度窗口，以及订阅和重置时间。 |
 | 额度显示与刷新 | 为两个服务分别选择剩余/已使用模式，用彩色标记查看使用程度；支持点击刷新、定时刷新和失败重试。 |
+| NVIDIA GPU 实时监控 | 点击右下角 GPU，在原生悬浮卡片每秒刷新完整 `nvidia-smi` 表格：显卡、显存、利用率、温度、功耗及进程。支持暂停、继续和单次刷新；Remote SSH 中读取远程主机。 |
 | VS Code 联网检测 | 从扩展宿主只访问 Google 公开网页；收到任意 HTTP 响应显示 `✅️`，无响应显示 `❌`。图标放在 Clash 地球图标前，启动时检测一次，之后默认每 **5 小时**一次，也可手动检测。 |
 | Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
@@ -43,10 +44,19 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | VS Code 扩展宿主 → Google | 启动时检测一次，之后每 **5 小时**一次；更新订阅成功后立即重测。 | 悬浮卡片中的“立即检测联网”。 |
 | Clash 节点 → Google | 启动时测速，之后每 **5 分钟**一次；切换节点或订阅后也会测速，更新订阅成功后追加全部节点并行测速。 | 悬浮卡片中的“刷新测速”。 |
 | 当前订阅 DNS 缓存 | 首次识别安装时缓存，之后每 **5 天**更新；VS Code 关闭期间不运行，重新连接后检查并补更。下载失败保留旧缓存，后台最多每小时重试一次。 | “DNS 使用订阅配置”始终先尝试下载最新值，失败再用缓存。 |
+| NVIDIA GPU 监控 | 点击 GPU 后，每轮读取结束 **1 秒**后再读取，不并发。窗口启动时不自动采样。 | 卡片顶部“暂停监控”“继续 / 重试”“刷新一次”。 |
 
 ![Agent Center 状态栏预览](image.png)
 
 上图展示额度状态项。联网与 Clash 合并显示的示例为 `✅️ 🌐 √ Google（1605 ms）`：最前面的图标表示扩展宿主检测结果，后面的延迟来自独立的 Clash 节点测速。
+
+## NVIDIA GPU 实时监控
+
+点击右下角独立的 **GPU** 按钮，在该状态项上方展开原生悬浮卡片，显示当前主机名和完整 `nvidia-smi` 原始表格，效果相当于 `watch -n 1 nvidia-smi`。保留表格列宽，宽表格可横向滚动，进程较多时可纵向滚动；操作链接放在顶部。此功能仅查询，不修改 GPU 配置，不打开终端或编辑器。
+
+首次点击后开始每秒采样。**暂停监控** 停止后续采样，取消正在执行的命令并保留最后一帧；再次点击 GPU 或“继续 / 重试”恢复。**刷新一次** 在暂停时只读取一轮。命令面板 **Agent Center: Start NVIDIA GPU Monitor** 也可启动，再点击 GPU 查看卡片。VS Code 没有公开此原生卡片的关闭事件，因此收起卡片后监控仍继续，点击暂停可停止；关闭功能或窗口、失去工作区信任时停止。单次命令超时 5 秒，驱动/工具缺失、失败或输出异常时暂停并显示原因，可点击重试。
+
+本地窗口查询本机；Remote SSH、WSL、容器查询当前扩展宿主，需要在对应环境安装 Agent Center，并有可用 NVIDIA 驱动及 `nvidia-smi`，容器还需能访问 GPU。默认从 PATH 查找，Windows 还检查常见驱动目录。不在 PATH 时设置 `agentStatus.gpu.nvidiaSmiPath` 为可执行文件路径（支持 `~/`，不是整条 shell 命令）；`agentStatus.gpu.enabled` 可隐藏按钮并停止监控。仅在受信任工作区执行。表格只保存在内存和卡片，诊断的 `gpu` 字段提供状态和时间，不包含完整进程列表。
 
 ## Codex 服务商切换与历史共用
 
@@ -200,6 +210,9 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 | 命令 | 用途 |
 | --- | --- |
+| Agent Center: Start NVIDIA GPU Monitor | 开始/继续每秒 GPU 监控，再点击 GPU 查看原生悬浮卡片。 |
+| Agent Center: Pause NVIDIA GPU Monitor | 暂停并保留最后一帧。 |
+| Agent Center: Refresh NVIDIA GPU Once | 读取一轮，暂停时不会自动恢复持续监控。 |
 | Agent Center: Switch Codex Provider | 选择官方 ChatGPT 或输入 API 服务商 ID，将全部已索引本地历史共用给所选服务商。 |
 | Agent Center: Refresh Codex Usage | 立即刷新当前环境的 Codex 额度。 |
 | Agent Center: Choose Codex Usage Display | 选择 Codex 显示剩余或已使用百分比。 |
@@ -229,6 +242,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 | 设置分组 | 启用/关闭 | 其他选项 |
 | --- | --- | --- |
+| NVIDIA GPU 监控 | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
 | Codex 服务商切换 | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex 额度 | `agentStatus.codex.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
 | Claude 额度 | `agentStatus.claude.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
@@ -263,6 +277,10 @@ npm run package
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.34 - 2026-10-26
+
+- 新增 GPU 按钮及原生 `nvidia-smi` 实时悬浮卡片，每秒采样，支持暂停、继续、单次刷新、远程主机、自定义工具路径、超时与取消保护。
 
 ### 0.1.33 - 2026-10-24
 
