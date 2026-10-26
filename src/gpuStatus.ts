@@ -208,24 +208,28 @@ export class GpuStatusMonitor implements vscode.Disposable {
     if (this.catalog?.detail) lines.push(escapeMarkdown(this.catalog.detail) + " · " + commandLink("重新读取", "agentStatus.reloadGpuServers"));
     const cpu = this.cpu;
     if (cpu?.state === "ready" && [cpu.totalPercent, cpu.coresUsed, cpu.machinePercent, cpu.logicalCores].every(Number.isFinite)) {
-      lines.push('<pre><code>CPU 总占用：<span style="color:#007acc;">' + cpu.totalPercent!.toFixed(1) + "%</span></code></pre>",
-        "```text\n约 " + cpu.coresUsed!.toFixed(2) + " 个满载逻辑核心 / " + cpu.logicalCores + " 个逻辑核心 · 全机 " + cpu.machinePercent!.toFixed(1) + "%\n```");
+      lines.push('<h3><code>CPU 总占用：<span style="color:#007acc;">' + cpu.totalPercent!.toFixed(1) + "%</span></code></h3>",
+        "<pre><code>约 " + cpu.coresUsed!.toFixed(2) + " 个满载逻辑核心 / " + cpu.logicalCores + " 个逻辑核心 · 全机 " + cpu.machinePercent!.toFixed(1) + "%</code></pre>");
     } else lines.push("```text\n" + (cpu ? "CPU 暂不可用" : "CPU 采样中…") + "\n```");
     if (!this.watching) lines.push("监控已暂停，保留最后一次结果。");
     lines.push((this.watching ? commandLink("暂停监控", "agentStatus.pauseGpuMonitor") : commandLink("继续 / 重试", "agentStatus.showGpuMonitor")) + " · " +
       commandLink("刷新一次", "agentStatus.refreshGpuMonitor") + " · " + commandLink("设置", "agentStatus.openSettings"));
     if (this.result && !this.result.ok) lines.push("**" + escapeMarkdown(this.result.detail) + "**");
     if (this.result?.output) {
-      // The CPU details code block activates VS Code's wider native hover layout.
-      // Keep the GPU table preformatted: tokenized blocks would wrap its columns
-      // using the (potentially larger) editor font. Escape all sampled HTML.
+      // Tokenize only nvidia-smi's first line (normally its timestamp) to activate
+      // VS Code's wider native hover. Keep CPU details and GPU columns at the
+      // compact hover font size instead of the potentially larger editor font.
       const text = this.result.output.slice(0, 64000);
-      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      const newline = text.indexOf("\n");
+      const firstLine = newline < 0 ? text : text.slice(0, newline);
+      // Use a fence longer than any sampled backtick run so output stays text.
+      const fence = "`".repeat(Math.max(3, ...[...firstLine.matchAll(/`+/g)].map(match => match[0].length + 1)));
+      lines.push(fence + "text\n" + firstLine + "\n" + fence);
+      const escaped = (newline < 0 ? "" : text.slice(newline + 1)).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-      lines.push("<pre><code>" + escaped + "</code></pre>");
+      if (escaped) lines.push("<pre><code>" + escaped + "</code></pre>");
       if (this.result.output.length > text.length) lines.push("输出过长，仅显示前 64000 个字符。");
     } else if (this.watching) lines.push("正在读取 nvidia-smi…");
-    if (this.watching) lines.push("移开后隐藏卡片，后台继续监控；点击“暂停监控”停止。");
     const tooltip = new vscode.MarkdownString(lines.join("\n\n"));
     tooltip.supportHtml = true;
     tooltip.isTrusted = { enabledCommands: ["agentStatus.showGpuMonitor", "agentStatus.pauseGpuMonitor", "agentStatus.refreshGpuMonitor", "agentStatus.openSettings",

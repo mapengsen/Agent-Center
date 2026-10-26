@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.43 - 2026-10-26
+
+### Changed / 调整
+
+- Enlarge aggregate CPU usage while keeping its percentage blue; compact the equivalent-core and whole-machine usage line. Remove the footer hint about hiding the card and background sampling.
+- 放大 CPU 总占用并保留蓝色百分比，缩小折合核心数与全机占用一行；删除移开隐藏及后台监控的底部提示。
+
 ## 0.1.42 - 2026-10-26
 
 ### Added / 新增

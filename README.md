@@ -297,6 +297,10 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 
 See [the complete changelog](CHANGELOG.md) for every release.
 
+### 0.1.43 - 2026-10-26
+
+- Enlarge aggregate CPU usage with a blue percentage, compact the core/machine summary and remove the background-monitoring footer hint.
+
 ### 0.1.42 - 2026-10-26
 
 - Check server logins when loading the list and append `(不能连接)` to failed entries. Retry on selection, clear recovered labels and keep GPU command failures separate from connection failures.

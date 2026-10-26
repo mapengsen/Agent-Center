@@ -2,7 +2,7 @@
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
   "description": "Codex/Claude quotas, provider switching, multi-server GPU/CPU monitoring, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.42",
+  "version": "0.1.43",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",

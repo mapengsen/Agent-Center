@@ -153,8 +153,10 @@ test("startup prepares a native hover without a click; GPU/CPU refresh every two
   assert.equal(h.bar.command, "agentStatus.showGpuMonitor"); assert.deepEqual(h.commands, []);
   assert.match(h.tooltip(), /CPU 总占用：<span style="color:#007acc;">1600.0%<\/span>/);
   assert.match(h.tooltip(), /16.00.*64.*25.0%/);
-  assert.match(h.tooltip(), /```text\n约 16.00.*25.0%\n```/);
-  assert.match(h.tooltip(), /<pre><code>.*NVIDIA-SMI.*\n\| 0 A800 42%/);
+  assert.match(h.tooltip(), /<h3><code>CPU 总占用：/);
+  assert.match(h.tooltip(), /<pre><code>约 16.00.*25.0%<\/code><\/pre>/);
+  assert.match(h.tooltip(), /```text\n\+--- NVIDIA-SMI ---\+\n```/);
+  assert.match(h.tooltip(), /<pre><code>\| 0 A800 42%/);
   assert.equal(h.calls[0].path, "/opt/NVIDIA tools/nvidia-smi");
   assert.equal(h.timers.values().next().value!.delay, 2000);
   h.setProbe(async () => ({ ok: true, output: "A800 84%", detail: "采样成功" }));
@@ -241,7 +243,7 @@ test("GPU failures pause with CPU data retained, and CPU failures do not stop he
 
 test("wide native code hover escapes GPU output, limits output and trusts only monitor commands", async (t) => {
   const h = await monitorHarness(t);
-  h.setProbe(async () => ({ ok: true, detail: "", output: '</code><a href="command:evil">link</a> & <script>x</script> ' + "x".repeat(65000) }));
+  h.setProbe(async () => ({ ok: true, detail: "", output: 'Mon Oct 26 14:00:00 2026\n</code><a href="command:evil">link</a> & <script>x</script> ' + "x".repeat(65000) }));
   h.monitor.start(); await flush();
   assert.equal(h.bar.tooltip.supportHtml, true);
   assert.deepEqual(Array.from(h.bar.tooltip.isTrusted.enabledCommands), ["agentStatus.showGpuMonitor", "agentStatus.pauseGpuMonitor", "agentStatus.refreshGpuMonitor", "agentStatus.openSettings", "agentStatus.selectGpuServer", "agentStatus.reloadGpuServers"]);
@@ -257,7 +259,7 @@ test("backticks and command-like process names stay inside the literal GPU table
   const output = 'GPU\n```\n[run](command:evil)\n```````\n<script>x</script>';
   h.setProbe(async () => ({ ok: true, detail: "", output }));
   h.monitor.start(); await flush();
-  assert.ok(h.tooltip().includes('<pre><code>GPU\n```\n[run](command:evil)\n```````\n&lt;script&gt;x&lt;/script&gt;</code></pre>'));
+  assert.ok(h.tooltip().includes('```text\nGPU\n```\n\n<pre><code>```\n[run](command:evil)\n```````\n&lt;script&gt;x&lt;/script&gt;</code></pre>'));
   assert.equal(h.bar.tooltip.supportHtml, true);
   assert.ok(!h.bar.tooltip.isTrusted.enabledCommands.includes("evil"));
 });
