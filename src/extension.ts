@@ -6,6 +6,8 @@ import { ClashStatusMonitor } from "./clashStatus";
 import { NetworkStatusMonitor } from "./networkStatus";
 import { CodexProviderSwitcher } from "./codexProvider";
 import { GpuStatusMonitor } from "./gpuStatus";
+import { WorkspaceGpuServers } from "./gpuServerCatalog";
+import { SavedGpuHostKeys, SshGpuReader, SshGpuProbe } from "./gpuSsh";
 
 export function activate(context: vscode.ExtensionContext): void {
   const codexUsage = new CodexUsageMonitor();
@@ -15,7 +17,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const networkStatus = new NetworkStatusMonitor((status) => clashStatus.setNetworkStatus(status));
   const diagnostics = vscode.window.createOutputChannel("Agent Center");
   const codexProvider = new CodexProviderSwitcher(context);
-  const gpu = new GpuStatusMonitor();
+  const gpuHostKeys = new SavedGpuHostKeys(context.globalState);
+  const gpu = new GpuStatusMonitor(undefined, new WorkspaceGpuServers(), new SshGpuReader(gpuHostKeys), new SshGpuProbe(gpuHostKeys));
 
   context.subscriptions.push(
     codexUsage,
@@ -29,6 +32,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("agentStatus.showGpuMonitor", () => gpu.show()),
     vscode.commands.registerCommand("agentStatus.pauseGpuMonitor", () => gpu.pause()),
     vscode.commands.registerCommand("agentStatus.refreshGpuMonitor", () => gpu.refresh()),
+    vscode.commands.registerCommand("agentStatus.selectGpuServer", (id: unknown) => gpu.selectServer(id)),
+    vscode.commands.registerCommand("agentStatus.reloadGpuServers", () => gpu.reloadServers()),
     vscode.commands.registerCommand("agentStatus.switchCodexProvider", () => codexProvider.choose()),
     vscode.commands.registerCommand("agentStatus.refreshCodexUsage", () => codexUsage.refresh("manual")),
     vscode.commands.registerCommand("agentStatus.restartCodexImageLinks", () => codexImageLinks.restart()),

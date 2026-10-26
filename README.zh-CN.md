@@ -2,7 +2,7 @@
 
 语言：<a href="https://github.com/mapengsen/Agent-Center/tree/main">English（默认）</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共用、NVIDIA GPU 监控、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
+Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共用、GPU/CPU 监控、VS Code 联网状态、Clash/Mihomo 节点与订阅管理集中到状态栏，并通过 `code -r` 辅助打开 Codex 对话中的文件链接。支持本地工作区、Remote SSH、WSL 和开发容器。
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -16,7 +16,7 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | Codex 使用额度 | 查看剩余或已使用百分比、短窗口与长窗口、重置时间，以及账户邮箱和套餐。 |
 | Claude 使用额度 | 查看接口返回的 5 小时、7 天、Opus、Sonnet 额度窗口，以及订阅和重置时间。 |
 | 额度显示与刷新 | 为两个服务分别选择剩余/已使用模式，用彩色标记查看使用程度；支持点击刷新、定时刷新和失败重试。 |
-| NVIDIA GPU 实时监控 | 点击右下角 GPU，在原生悬浮卡片每秒刷新完整 `nvidia-smi` 表格：显卡、显存、利用率、温度、功耗及进程。支持暂停、继续和单次刷新；Remote SSH 中读取远程主机。 |
+| GPU/CPU 实时监控 | 悬停 GPU 展示原生浮动卡片，移开隐藏；读取当前工作区根目录的 `可用服务器.md`，点击服务器名称切换 CPU/GPU 状态，每 2 秒更新当前选中的机器，保留暂停、继续和单次刷新。 |
 | VS Code 联网检测 | 从扩展宿主只访问 Google 公开网页；收到任意 HTTP 响应显示 `✅️`，无响应显示 `❌`。图标放在 Clash 地球图标前，启动时检测一次，之后默认每 **5 小时**一次，也可手动检测。 |
 | Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
@@ -44,19 +44,37 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | VS Code 扩展宿主 → Google | 启动时检测一次，之后每 **5 小时**一次；更新订阅成功后立即重测。 | 悬浮卡片中的“立即检测联网”。 |
 | Clash 节点 → Google | 启动时测速，之后每 **5 分钟**一次；切换节点或订阅后也会测速，更新订阅成功后追加全部节点并行测速。 | 悬浮卡片中的“刷新测速”。 |
 | 当前订阅 DNS 缓存 | 首次识别安装时缓存，之后每 **5 天**更新；VS Code 关闭期间不运行，重新连接后检查并补更。下载失败保留旧缓存，后台最多每小时重试一次。 | “DNS 使用订阅配置”始终先尝试下载最新值，失败再用缓存。 |
-| NVIDIA GPU 监控 | 点击 GPU 后，每轮读取结束 **1 秒**后再读取，不并发。窗口启动时不自动采样。 | 卡片顶部“暂停监控”“继续 / 重试”“刷新一次”。 |
+| GPU/CPU 监控 | 启动时采样，每轮读取结束 **2 秒**后再读取，不并发。隐藏卡片后继续后台监控，可手动暂停。 | 原生悬浮卡片中的暂停、继续及单次刷新链接。 |
 
 ![Agent Center 状态栏预览](image.png)
 
 上图展示额度状态项。联网与 Clash 合并显示的示例为 `✅️ 🌐 √ Google（1605 ms）`：最前面的图标表示扩展宿主检测结果，后面的延迟来自独立的 Clash 节点测速。
 
-## NVIDIA GPU 实时监控
+## GPU/CPU 实时监控
 
-点击右下角独立的 **GPU** 按钮，在该状态项上方展开原生悬浮卡片，显示当前主机名和完整 `nvidia-smi` 原始表格，效果相当于 `watch -n 1 nvidia-smi`。保留表格列宽，宽表格可横向滚动，进程较多时可纵向滚动；操作链接放在顶部。此功能仅查询，不修改 GPU 配置，不打开终端或编辑器。
+鼠标悬停右下角 **GPU**，在状态栏上方展示原生浮动卡片；移开图标及卡片后隐藏。上方显示 CPU 利用率，下方显示当前主机完整 `nvidia-smi` 原始表格。卡片独立于 Codex，不打开编辑器或侧栏标签，不改变当前布局。VS Code 更新卡片时可能闪烁、重置滚动位置；不打开终端或常驻 `watch` 进程。
 
-首次点击后开始每秒采样。**暂停监控** 停止后续采样，取消正在执行的命令并保留最后一帧；再次点击 GPU 或“继续 / 重试”恢复。**刷新一次** 在暂停时只读取一轮。命令面板 **Agent Center: Start NVIDIA GPU Monitor** 也可启动，再点击 GPU 查看卡片。VS Code 没有公开此原生卡片的关闭事件，因此收起卡片后监控仍继续，点击暂停可停止；关闭功能或窗口、失去工作区信任时停止。单次命令超时 5 秒，驱动/工具缺失、失败或输出异常时暂停并显示原因，可点击重试。
+功能启用且工作区受信任时自动开始采样，每轮读取结束 2 秒后再采样。原生状态栏 API 没有悬浮卡片的显示/隐藏事件，因此移开只隐藏卡片，后台继续监控；下次悬停立即展示最新结果。点 **暂停监控** 停止；**继续 / 重试** 或点击 GPU 恢复。**刷新一次** 在暂停时只读取一轮。卡片大小和隐藏行为由 VS Code 原生悬浮组件管理。
+
+CPU 根据扩展宿主的操作系统 CPU 时间差计算，**100% = 一个逻辑核心满载**，所以 **1600% ≈ 16 个逻辑核心满载**，不一定是 16 个物理核心。同时显示逻辑核心总数和整机百分比，例如 64 个逻辑核心的机器上，1600% 相当于整机 25%。首次使用 250 毫秒的新采样区间，后续使用两次更新间的时间差。容器内的系统可见 CPU 计数可能覆盖宿主机，不一定等于容器的 CPU 配额。
+
+暂停时取消当前读取，保留最后一次 CPU/GPU 结果。关闭功能或窗口、失去工作区信任时停止监控。单次 GPU 命令超时 5 秒，驱动/工具缺失或失败时暂停并显示原因，可重试。采样不会重叠执行。
 
 本地窗口查询本机；Remote SSH、WSL、容器查询当前扩展宿主，需要在对应环境安装 Agent Center，并有可用 NVIDIA 驱动及 `nvidia-smi`，容器还需能访问 GPU。默认从 PATH 查找，Windows 还检查常见驱动目录。不在 PATH 时设置 `agentStatus.gpu.nvidiaSmiPath` 为可执行文件路径（支持 `~/`，不是整条 shell 命令）；`agentStatus.gpu.enabled` 可隐藏按钮并停止监控。仅在受信任工作区执行。表格只保存在内存和卡片，诊断的 `gpu` 字段提供状态和时间，不包含完整进程列表。
+
+监控多台 Linux 服务器时，在当前工作区根目录放置 **可用服务器.md**，例如 `/zengxiangxiang/mps/DNAKit/可用服务器.md`，每行一台：
+
+```text
+40901：ssh root@gpu1.example -p 2201 密码：your-password
+40902：ssh root@gpu2.example -p 2202 密码：your-password
+h20*8：ssh -i ~/.ssh/id_rsa user@gpu3.example -p 22
+```
+
+浮窗顶部自动出现 **当前机器**、**40901**、**40902** 等可点击入口，勾号表示当前选择。列表载入后自动检查 SSH 登录，最多 2 台并行，失败条目直接显示为 **40901(不能连接)**；仍可点击重试，成功后去掉标注。点击服务器后，CPU 和 GPU 一起切换，关闭上一台用于采样的 SSH 连接，并每 2 秒读取选中机器；完整 CPU/GPU 数据只针对当前选择采样。点击 **当前机器** 返回当前扩展宿主；Remote SSH 中就是当前连接的远程机器。
+
+文件创建、保存或删除时自动重读，也可运行 **Agent Center: Reload GPU Server List**。多根工作区采用当前编辑器所属文件夹，无法判断时使用第一个；删除正在监控的条目后返回当前机器。支持 `-p`、`-i` 和 `-l`，拒绝任意其他 SSH 参数及附加命令。远程采样读取服务器 PATH 中的 `nvidia-smi` 和 Linux `/proc/stat`；相对密钥路径基于工作区根目录，`~/`、SSH Agent 和默认密钥属于运行插件的扩展宿主。密码只从原文件读取并用于连接内存，不放进命令链接或诊断。首次连接记录 SSH 主机密钥指纹，之后校验，密钥变化时拒绝连接。含密码的服务器文件请妥善保存。
+
+最低要求 **VS Code 1.106**。监控使用更宽的原生代码浮窗布局，保留 GPU 表格原有的列对齐，避免普通富文本区域过窄而截断列。可用空间仍受窗口大小和字体设置限制。采样输出经过 HTML 转义后作为纯文字展示，仅信任监控、服务器选择和设置命令，采样输出不写入持久存储。
 
 ## Codex 服务商切换与历史共用
 
@@ -210,9 +228,10 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 | 命令 | 用途 |
 | --- | --- |
-| Agent Center: Start NVIDIA GPU Monitor | 开始/继续每秒 GPU 监控，再点击 GPU 查看原生悬浮卡片。 |
+| Agent Center: Start NVIDIA GPU Monitor | 显示原生 GPU/CPU 悬浮卡片并开始/继续监控。 |
 | Agent Center: Pause NVIDIA GPU Monitor | 暂停并保留最后一帧。 |
 | Agent Center: Refresh NVIDIA GPU Once | 读取一轮，暂停时不会自动恢复持续监控。 |
+| Agent Center: Reload GPU Server List | 重新读取当前工作区根目录的 `可用服务器.md`。 |
 | Agent Center: Switch Codex Provider | 选择官方 ChatGPT 或输入 API 服务商 ID，将全部已索引本地历史共用给所选服务商。 |
 | Agent Center: Refresh Codex Usage | 立即刷新当前环境的 Codex 额度。 |
 | Agent Center: Choose Codex Usage Display | 选择 Codex 显示剩余或已使用百分比。 |
@@ -242,7 +261,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 
 | 设置分组 | 启用/关闭 | 其他选项 |
 | --- | --- | --- |
-| NVIDIA GPU 监控 | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
+| GPU/CPU 监控 | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
 | Codex 服务商切换 | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex 额度 | `agentStatus.codex.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
 | Claude 额度 | `agentStatus.claude.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
@@ -277,6 +296,38 @@ npm run package
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.42 - 2026-10-26
+
+- 载入列表时自动检查登录，在失败服务器名称后标注 `(不能连接)`；点击可重试，恢复后清除标注，GPU 命令报错与连接失败分开处理。
+
+### 0.1.41 - 2026-10-26
+
+- 读取工作区 `可用服务器.md`，在原有浮窗顶部点击服务器名称，一键切换当前机器及 SSH 服务器的 CPU/GPU 状态；保留蓝色 CPU 百分比、2 秒监控、暂停与单次刷新，自动重读列表，防止旧采样串入和凭据泄露。
+
+### 0.1.40 - 2026-10-26
+
+- CPU 总占用百分比显示为蓝色，删除浮窗中的主机信息行。
+
+### 0.1.39 - 2026-10-26
+
+- 删除浮窗标题、百分比说明、刷新提示及额外的更新时间，为 CPU/GPU 数据留出更多空间。
+
+### 0.1.38 - 2026-10-26
+
+- 监控改用更宽的原生代码浮窗布局，保留 GPU 表格列对齐，改善右侧列被截断的问题；保留悬停显示、CPU 信息和 2 秒监控。
+
+### 0.1.37 - 2026-10-26
+
+- GPU/CPU 改为原生浮动卡片，悬停显示、移开隐藏；保留 CPU/GPU 数据及暂停、继续、单次刷新，启用时后台每 2 秒自动监控。
+
+### 0.1.36 - 2026-10-26
+
+- GPU 改为独立的大编辑区域，鼠标进入后移出自动关闭，可固定或按 Escape 关闭；上方增加 CPU 总占用、折合满载逻辑核心数与整机百分比，每轮只更新文字，不闪烁。
+
+### 0.1.35 - 2026-10-26
+
+- GPU 改为右侧固定面板，每秒只更新文字，避免整块重建闪烁并保留滚动位置；隐藏时自动暂停。最低要求 VS Code 1.106。
 
 ### 0.1.34 - 2026-10-26
 

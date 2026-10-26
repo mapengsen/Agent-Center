@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "Codex/Claude quotas, provider switching, live NVIDIA GPU hover, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.34",
+  "description": "Codex/Claude quotas, provider switching, multi-server GPU/CPU monitoring, Google connectivity, Clash controls and file-link recovery.",
+  "version": "0.1.42",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -11,7 +11,7 @@
     "url": "https://github.com/mapengsen/Agent-Center.git"
   },
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.106.0"
   },
   "extensionKind": [
     "workspace"
@@ -53,9 +53,22 @@
       }
     },
     "commands": [
-      { "command": "agentStatus.showGpuMonitor", "title": "Agent Center: Start NVIDIA GPU Monitor" },
-      { "command": "agentStatus.pauseGpuMonitor", "title": "Agent Center: Pause NVIDIA GPU Monitor" },
-      { "command": "agentStatus.refreshGpuMonitor", "title": "Agent Center: Refresh NVIDIA GPU Once" },
+      {
+        "command": "agentStatus.showGpuMonitor",
+        "title": "Agent Center: Start NVIDIA GPU Monitor"
+      },
+      {
+        "command": "agentStatus.pauseGpuMonitor",
+        "title": "Agent Center: Pause NVIDIA GPU Monitor"
+      },
+      {
+        "command": "agentStatus.refreshGpuMonitor",
+        "title": "Agent Center: Refresh NVIDIA GPU Once"
+      },
+      {
+        "command": "agentStatus.reloadGpuServers",
+        "title": "Agent Center: Reload GPU Server List"
+      },
       {
         "command": "agentStatus.switchCodexProvider",
         "title": "Agent Center: Switch Codex Provider"
@@ -149,11 +162,14 @@
       "title": "Agent Center",
       "properties": {
         "agentStatus.gpu.enabled": {
-          "type": "boolean", "default": true,
-          "description": "在右下角显示 GPU 按钮。点击后在原生悬浮卡片每秒更新当前扩展宿主的 nvidia-smi 输出；暂停、关闭功能或关闭窗口时停止。Remote SSH 中读取远程主机。"
+          "type": "boolean",
+          "default": true,
+          "description": "在右下角显示 GPU 按钮，悬停展示浮动卡片、移开隐藏。读取当前工作区根目录的可用服务器.md，点击服务器名称切换 CPU/GPU 状态；每 2 秒更新当前选中的机器，保留暂停、继续和刷新一次。CPU 100% = 1 个逻辑核心，Remote SSH 的“当前机器”为远程扩展宿主。原生卡片更新可能闪烁。"
         },
         "agentStatus.gpu.nvidiaSmiPath": {
-          "type": "string", "default": "", "scope": "machine-overridable",
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
           "description": "当前扩展宿主的 nvidia-smi 可执行文件路径，不是整条 shell 命令；支持 ~/。留空从 PATH 查找，Windows 还检查常见驱动目录。"
         },
         "agentStatus.codexImageLinks.enabled": {
@@ -371,17 +387,19 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js out/test/clashNodeTests.test.js out/test/clashBestNode.test.js out/test/gpu.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js out/test/clashNodeTests.test.js out/test/clashBestNode.test.js out/test/gpu.test.js out/test/cpu.test.js out/test/gpuServers.test.js out/test/gpuServerCatalog.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },
   "dependencies": {
     "@iarna/toml": "2.2.5",
     "axios": "^1.7.9",
-    "js-yaml": "^4.3.1"
+    "js-yaml": "^4.3.1",
+    "ssh2": "1.17.0"
   },
   "devDependencies": {
     "@types/node": "20.19.43",
+    "@types/ssh2": "1.15.6",
     "@types/vscode": "1.93.0",
     "@vscode/vsce": "3.9.2",
     "typescript": "^5.5.4"

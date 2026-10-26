@@ -1,5 +1,75 @@
 # Changelog / 更新日志
 
+## 0.1.42 - 2026-10-26
+
+### Added / 新增
+
+- Check SSH login for discovered servers with two concurrent probes and mark failed entries with (不能连接) directly in their selector labels. Retry on selection or list reload, clear recovered labels and prevent stale probes from overriding newer successful samples.
+- 自动检查服务器 SSH 登录，最多 2 台并行，失败名称直接标注 (不能连接)；点击服务器或重读列表可重试，恢复后清除标注，旧探测不会覆盖更新的成功采样。
+- Keep login probes separate from active sampling and treat missing GPU tools as command failures rather than failed connections.
+- 登录探测与当前采样连接分开，GPU 工具缺失单独显示命令错误，不误标为连接失败。
+
+## 0.1.41 - 2026-10-26
+
+### Added / 新增
+
+- Discover SSH server entries in the active workspace root's 可用服务器.md. Add current-host/server selection links above the existing GPU/CPU hover, switch both readings together and sample the selected host every two seconds over a reused SSH connection.
+- 自动读取当前工作区根目录的可用服务器.md，在原有 GPU/CPU 浮窗上方增加当前机器及各服务器入口，点击后同时切换 CPU/GPU，每 2 秒通过复用 SSH 连接采样所选机器。
+- Support password, identity-file and agent/default-key authentication, Linux CPU counters and raw nvidia-smi tables. Watch list edits/deletions and workspace-root changes, return to the current host if the selected entry disappears, and expose manual list reload.
+- 支持密码、密钥文件及 Agent/默认密钥登录，读取 Linux CPU 计数和 nvidia-smi 原始表格。自动处理列表修改、删除和工作区根目录变化，当前条目删除后回到当前机器，提供手动重读命令。
+- Validate entries as connection data instead of executing document commands. Keep credentials out of links/diagnostics, pin SSH host keys, cap connection/read times and output sizes, cancel old reads on switching and suppress stale frames.
+- 只把条目作为连接数据解析，不执行文档中的命令；凭据不进入链接或诊断，记录并校验主机密钥，限制连接/采样时间及输出，切换时取消旧读取并抑制过期数据。
+
+## 0.1.40 - 2026-10-26
+
+### Changed / 调整
+
+- Show the aggregate CPU percentage in blue and remove the host-information line from the GPU/CPU hover. Retain the wider table layout, CPU details, actions and two-second monitoring.
+- CPU 总占用百分比改为蓝色，删除 GPU/CPU 浮窗中的主机信息行；保留加宽表格、CPU 详情、操作入口和 2 秒监控。
+
+## 0.1.39 - 2026-10-26
+
+### Changed / 调整
+
+- Remove the GPU/CPU hover title, CPU percentage explanation, refresh/hover hint and extra update timestamp. Retain host details, CPU readings, actions, the original nvidia-smi table and two-second monitoring.
+- 删除 GPU/CPU 浮窗标题、CPU 百分比说明、刷新/悬停提示及额外的更新时间；保留主机、CPU 数据、操作入口、原始 nvidia-smi 表格和 2 秒监控。
+
+## 0.1.38 - 2026-10-26
+
+### Fixed / 修复
+
+- Use a native text code block for the CPU reading to activate VS Code's wider code-hover layout, while retaining the preformatted GPU table and its original hover font. Keep CPU details, hover behavior and two-second polling; respect native window/font size limits.
+- CPU 读数使用原生纯文字代码块，让 VS Code 使用更宽的代码浮窗布局；GPU 表格保留原来的预格式化文字与字体，改善列截断且避免换行破坏对齐。保留 CPU 详情、悬停交互和 2 秒监控，遵循原生窗口与字体尺寸限制。
+- Continue escaping all sampled HTML and trusting only the monitor/settings commands, keeping process names literal and preventing command-link injection.
+- 继续转义全部采样 HTML，仅信任监控与设置命令，进程名仅按文字展示，避免内容变成命令链接。
+
+## 0.1.37 - 2026-10-26
+
+### Changed / 调整
+
+- Replace the independent editor panel with a native GPU/CPU floating status-bar hover. Hover to show, move away to hide, with no editor tab or layout changes. Native hover updates may flicker or reset scrolling.
+- GPU/CPU 改为状态栏原生浮动卡片，悬停显示、移开隐藏，不打开编辑器或改变布局；原生卡片更新可能闪烁或重置滚动位置。
+- Keep aggregate CPU usage, equivalent busy logical processors, whole-machine percentage, complete nvidia-smi output, pause/resume and single refresh. Sample automatically at startup and two seconds after each completed read; native-hover visibility does not stop background monitoring. Preserve cancellation, timeout, trust and output-escaping protections.
+- 保留 CPU 总占用、折合满载逻辑核心数、整机百分比、完整 nvidia-smi 表格、暂停、继续及单次刷新。启动后自动监控，每轮结束 2 秒后再采样；移开只隐藏卡片，后台继续监控，保留取消、超时、信任与输出转义保护。
+
+## 0.1.36 - 2026-10-26
+
+### Added / 新增
+
+- Move GPU monitoring into a large independent editor area, separate from Codex. Close only this panel after pointer exit, with a pin button for resizing and Escape to close. Pause on hide/close and retain the last frame and auto-hide scroll position.
+- GPU 改为独立于 Codex 的大编辑区域；鼠标进入后移出自动关闭，只关闭自己的标签。支持固定后调整大小、Escape 关闭，隐藏/关闭自动暂停，保留上次数据与自动关闭时的滚动位置。
+- Show interval-based CPU usage above the GPU table: 100% per logical processor, equivalent busy processors, logical CPU count and whole-machine percentage. Sample on the current extension host, handle cancellation and invalid counters, and update text in place without rebuilding the page.
+- GPU 表格上方增加 CPU 区间利用率：每个逻辑核心满载计 100%，显示折合满载核心数、逻辑核心总数与整机百分比。读取当前扩展宿主，支持取消与异常计数，只更新文字，避免闪烁。
+
+## 0.1.35 - 2026-10-26
+
+### Fixed / 修复
+
+- Replace the native GPU hover with a persistent right-side WebviewView. Set HTML once and send samples as messages; update changed text only, preserve scrolling and keep controls stable. Hide/close pauses polling; reopening retains the view.
+- GPU 改为右侧固定面板，HTML 仅初始化一次；每秒通过数据消息更新变化的文字，保持控件及滚动位置，避免整块卡片重建闪烁。隐藏/关闭时暂停，重新打开保留上次状态。
+- Require VS Code 1.106+ for the stable Secondary Side Bar container. Keep remote-host sampling, timeouts, cancellation and single-refresh behavior; protect the view with a strict CSP, plain-text output and an action allowlist.
+- 右侧视图使用正式 API，最低要求 VS Code 1.106；保留远程主机、超时、取消和单次刷新，使用严格 CSP、纯文字输出及动作白名单。
+
 ## 0.1.34 - 2026-10-26
 
 ### Added / 新增

@@ -2,7 +2,7 @@
 
 Language: <a href="https://github.com/mapengsen/Agent-Center/tree/main">English (default)</a> | <a href="https://github.com/mapengsen/Agent-Center/blob/main/README.zh-CN.md">简体中文</a>
 
-Agent Center puts Codex and Claude usage quotas, Codex provider switching with shared history, live NVIDIA GPU monitoring, VS Code internet connectivity, and Clash/Mihomo controls in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
+Agent Center puts Codex and Claude usage quotas, Codex provider switching with shared history, live GPU/CPU monitoring, VS Code internet connectivity, and Clash/Mihomo controls in the status bar. It also recovers file links from Codex conversations through `code -r`. It supports local workspaces, Remote SSH, WSL and Dev Containers.
 
 **GitHub**: [github.com/mapengsen/Agent-Center](https://github.com/mapengsen/Agent-Center)
 
@@ -16,7 +16,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Codex usage quotas | See remaining or used percentages, short/long windows, reset times, account email and plan in the status bar and hover. |
 | Claude usage quotas | Inspect 5-hour, 7-day, Opus and Sonnet windows when returned by the service, plus subscription and reset details. |
 | Quota display and refresh | Choose remaining/used mode for each provider, see colored usage markers, click to refresh, and use automatic refresh with failure retries. |
-| Live NVIDIA GPU monitor | Click GPU for a native floating card with the complete `nvidia-smi` table: devices, memory, utilization, temperature, power and processes. Sample every second, pause/resume or refresh once. Remote SSH queries the remote host. |
+| Live GPU/CPU monitor | Hover over GPU for a native floating card; move away to hide it. Read `可用服务器.md` from the current workspace root and click a server name to switch CPU/GPU monitoring. Refresh the selected machine every two seconds, with pause/resume and single refresh. |
 | VS Code internet connectivity | Request only Google's public website from the extension host. Any HTTP response shows `✅️`; no response shows `❌`. The single icon sits before the Clash globe. Checks run at startup and every **5 hours**, with manual checks available. |
 | Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
@@ -44,19 +44,37 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | VS Code host → Google | At startup, then every **5 hours**, and immediately after a successful subscription update. | Choose “立即检测联网” in the hover card. |
 | Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. Successful subscription updates additionally test all loaded nodes in parallel. | Choose “刷新测速” in the hover card. |
 | Current subscription DNS cache | Cache on discovery, then refresh every **5 days**, checking overdue work after reconnecting. Failed downloads retain prior data and retry at most hourly. Requires the extension to be running. | “DNS 使用订阅配置” always tries a fresh download before falling back to cache. |
-| NVIDIA GPU monitor | Start on click; sample **1 second after each completed read**, without overlapping commands. No sampling on window startup. | Pause/resume and refresh-once links at the top of the GPU hover. |
+| GPU/CPU monitor | Sample at startup, then **2 seconds after each completed read**, without overlap. Hidden cards keep sampling until paused. | Pause/resume and single-refresh links in the native hover. |
 
 ![Agent Center status bar preview](image.png)
 
 The image shows the quota items. A combined connectivity and Clash example is `✅️ 🌐 √ Google（1605 ms）`: the leading icon is the extension-host check, and the latency is the independent Clash node test.
 
-## Live NVIDIA GPU monitoring
+## Live GPU/CPU monitoring
 
-Click the separate bottom-right **GPU** button to open a native floating hover above the status item. See the machine hostname and complete original `nvidia-smi` table, with the effect of `watch -n 1 nvidia-smi`. Fixed-width columns are retained; scroll horizontally for wide tables and vertically for long process lists. Controls remain at the top. This is read-only and opens no terminal or editor.
+Hover over the bottom-right **GPU** item to show a native floating card above the status bar; move away from the item and card to hide it. CPU usage appears above the complete original `nvidia-smi` table. The card is independent of Codex, opens no editor/sidebar tab and does not alter your layout. It may flicker and its scroll position may reset when VS Code rebuilds it on a data update. No terminal or persistent `watch` process is started.
 
-Sampling starts on click. **暂停监控** stops future reads, cancels a running command and retains the last frame. Click GPU again or **继续 / 重试** to resume. **刷新一次** reads one sample without restarting a paused watch. **Agent Center: Start NVIDIA GPU Monitor** also starts sampling; click GPU to view its hover. VS Code exposes no public close event for this native status-bar hover, so closing the card does not pause sampling. Use pause; disabling the feature, losing workspace trust or closing the window also stops it. A five-second timeout, driver/executable errors or invalid output pause the watch and show a retry action.
+Sampling starts automatically when the feature is enabled in a trusted workspace, then runs two seconds after each completed read. The native status-bar API has no hover visibility events, so moving away hides the card while background sampling continues. The next hover immediately displays the latest snapshot. Click **暂停监控** to stop; **继续 / 重试** or clicking GPU resumes. **刷新一次** reads one sample without restarting a paused watch. Native cards use VS Code's own sizing and dismissal behavior.
+
+CPU uses changes in the extension host's OS CPU counters: **100% = one fully busy logical processor**, so **1600% ≈ 16 logical processors fully busy**, which need not mean 16 physical cores. The panel also shows the logical CPU count and normalized whole-machine percentage. For example, on 64 logical CPUs, 1600% corresponds to 25% of the machine. The first sample measures a fresh 250 ms interval; subsequent samples measure between updates. In containers, OS-visible CPU counters may cover the host and are not necessarily the container's CPU quota.
+
+Pausing cancels the current read and retains the last CPU/GPU snapshot. Disabled features, untrusted workspaces and window closure stop polling. Five-second GPU command timeouts and driver/executable failures pause monitoring and show a retry action. Read operations never overlap.
 
 Local windows query the local machine; Remote SSH, WSL and containers query their current extension host. Install Agent Center there, with a working NVIDIA driver and `nvidia-smi`; containers need GPU access. Default discovery uses PATH, plus common NVIDIA driver paths on Windows. Set `agentStatus.gpu.nvidiaSmiPath` to an executable path (supports `~/`, not a full shell command), or use `agentStatus.gpu.enabled` to hide the button and stop monitoring. Requires a trusted workspace. Output stays in memory and the hover; the `gpu` diagnostics field contains state/timestamps without the full process list.
+
+For multiple Linux servers, place **可用服务器.md** in the current workspace root, for example `/zengxiangxiang/mps/DNAKit/可用服务器.md`, using one entry per line:
+
+```text
+40901：ssh root@gpu1.example -p 2201 密码：your-password
+40902：ssh root@gpu2.example -p 2202 密码：your-password
+h20*8：ssh -i ~/.ssh/id_rsa user@gpu3.example -p 22
+```
+
+The hover adds **当前机器**, **40901**, **40902**, etc. as clickable selections; a check marks the active one. A short SSH login check runs when the list loads, up to two at a time; unsuccessful entries show **40901(不能连接)**. Selecting an entry retries it and clears the label on recovery. Selecting a server replaces both CPU and GPU data, closes the previous SSH sampling connection and starts two-second monitoring on the selected host. Full CPU/GPU readings are queried for the selected machine. **当前机器** returns to the current extension host.
+
+The list reloads on file creation, save or deletion; **Agent Center: Reload GPU Server List** also rereads it. Multi-root workspaces use the active editor's workspace folder, falling back to the first folder. Removing the selected entry returns to the current machine. `-p`, `-i` and `-l` are supported; arbitrary SSH flags and trailing commands are rejected. Remote monitoring uses `nvidia-smi` on the server's PATH and Linux `/proc/stat`. Relative key paths resolve from the workspace root; `~/` and the SSH agent/default keys refer to the extension host running Agent Center. Passwords stay in the source file and connection memory, never command links or diagnostics. First connections pin the SSH host-key fingerprint in extension storage; subsequent connections reject a changed key. Keep the server file private if it contains passwords.
+
+Requires **VS Code 1.106+**. The monitor uses VS Code's wider native code-hover layout instead of the narrower rich-text layout, while keeping the GPU table's columns preformatted. Window size and font settings still constrain available space. Sampled output is HTML-escaped; only monitor, server-selection and settings commands are trusted. Sampling output is not persisted.
 
 ## Codex provider switching and shared history
 
@@ -210,9 +228,10 @@ Open the command palette with `Ctrl+Shift+P` / `Cmd+Shift+P` and search for **Ag
 
 | Command | Purpose |
 | --- | --- |
-| Agent Center: Start NVIDIA GPU Monitor | Start/resume one-second sampling; click GPU to view the native hover. |
+| Agent Center: Start NVIDIA GPU Monitor | Show the native GPU/CPU hover and start/resume sampling. |
 | Agent Center: Pause NVIDIA GPU Monitor | Stop sampling and retain the last frame. |
 | Agent Center: Refresh NVIDIA GPU Once | Read one sample without restarting a paused watch. |
+| Agent Center: Reload GPU Server List | Reread `可用服务器.md` from the current workspace root. |
 | Agent Center: Switch Codex Provider | Choose official ChatGPT or enter an API ID; share all indexed local history with the selected provider. |
 | Agent Center: Refresh Codex Usage | Refresh the current environment's Codex quota. |
 | Agent Center: Choose Codex Usage Display | Choose remaining or used percentage for Codex. |
@@ -242,7 +261,7 @@ Search for **Agent Center** in Settings, or run **Agent Center: Open Settings**.
 
 | Settings group | Enable/disable | Other options |
 | --- | --- | --- |
-| NVIDIA GPU monitor | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
+| GPU/CPU monitor | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
 | Codex provider switching | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex quota | `agentStatus.codex.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
 | Claude quota | `agentStatus.claude.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
@@ -277,6 +296,38 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.42 - 2026-10-26
+
+- Check server logins when loading the list and append `(不能连接)` to failed entries. Retry on selection, clear recovered labels and keep GPU command failures separate from connection failures.
+
+### 0.1.41 - 2026-10-26
+
+- Read workspace server definitions from `可用服务器.md` and switch the existing hover between local/current-host and SSH CPU/GPU monitoring with one click. Keep blue CPU percentages, two-second polling and pause/refresh actions; watch list changes and protect against stale samples and credential exposure.
+
+### 0.1.40 - 2026-10-26
+
+- Color the aggregate CPU percentage blue and remove the hover's host-information line.
+
+### 0.1.39 - 2026-10-26
+
+- Remove the hover title, percentage explanation, refresh hint and extra update timestamp to leave more room for CPU/GPU data.
+
+### 0.1.38 - 2026-10-26
+
+- Use the wider native code-hover layout and preserve GPU table alignment to reveal columns clipped by the rich-text hover. Keep hover behavior, CPU data and two-second monitoring.
+
+### 0.1.37 - 2026-10-26
+
+- Show GPU/CPU in the native floating status-bar hover, visible on hover and hidden when moving away. Keep the CPU/GPU data and pause/resume/single refresh; sample automatically every two seconds.
+
+### 0.1.36 - 2026-10-26
+
+- Open a large independent GPU/CPU editor panel; auto-close after pointer exit, with pin and Escape controls. Update aggregate CPU usage and GPU text in place without flicker.
+
+### 0.1.35 - 2026-10-26
+
+- Replace the native GPU hover with a persistent right-side view; update changed text in place, retain scrolling and pause when hidden. Requires VS Code 1.106+.
 
 ### 0.1.34 - 2026-10-26
 

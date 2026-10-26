@@ -49,7 +49,7 @@ async function sample(executable: string, signal?: AbortSignal): Promise<NvidiaS
       if (tooLarge) return resolve({ ok: false, output: "", detail: "nvidia-smi 输出超过 1 MiB，监控已暂停。" });
       const output = [cleanOutput(Buffer.concat(stdout).toString("utf8")), cleanOutput(Buffer.concat(stderr).toString("utf8"))].filter(Boolean).join("\n");
       const ok = !failure && code === 0 && Boolean(output);
-      resolve({ ok, output, detail: ok ? "每秒刷新" : failure ? "无法执行 nvidia-smi，请检查可执行文件和权限。"
+      resolve({ ok, output, detail: ok ? "采样成功" : failure ? "无法执行 nvidia-smi，请检查可执行文件和权限。"
         : output ? "nvidia-smi 返回错误，监控已暂停。" : "nvidia-smi 未返回有效输出，监控已暂停。" });
     });
     // Account for cancellation between the initial check and listener registration.
