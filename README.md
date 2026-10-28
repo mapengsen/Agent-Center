@@ -58,7 +58,7 @@ Sampling starts automatically when the feature is enabled in a trusted workspace
 
 CPU uses changes in the extension host's OS CPU counters: **100% = one fully busy logical processor**, so **1600% ≈ 16 logical processors fully busy**, which need not mean 16 physical cores. The panel also shows the logical CPU count and normalized whole-machine percentage. For example, on 64 logical CPUs, 1600% corresponds to 25% of the machine. The first sample measures a fresh 250 ms interval; subsequent samples measure between updates. In containers, OS-visible CPU counters may cover the host and are not necessarily the container's CPU quota.
 
-Pausing cancels the current read and retains the last CPU/GPU snapshot. Disabled features, untrusted workspaces and window closure stop polling. Five-second GPU command timeouts and driver/executable failures pause monitoring and show a retry action. Read operations never overlap.
+Pausing cancels the current read and retains the last CPU/GPU snapshot. Disabled features, untrusted workspaces and window closure stop polling. GPU commands have a 30-second timeout; SSH sampling allows 32 seconds for the GPU command, CPU counters and transport. Timeouts and driver/executable failures pause monitoring and show a retry action. Read operations never overlap.
 
 Local windows query the local machine; Remote SSH, WSL and containers query their current extension host. Install Agent Center there, with a working NVIDIA driver and `nvidia-smi`; containers need GPU access. Default discovery uses PATH, plus common NVIDIA driver paths on Windows. Set `agentStatus.gpu.nvidiaSmiPath` to an executable path (supports `~/`, not a full shell command), or use `agentStatus.gpu.enabled` to hide the button and stop monitoring. Requires a trusted workspace. Output stays in memory and the hover; the `gpu` diagnostics field contains state/timestamps without the full process list.
 
@@ -72,7 +72,7 @@ h20*8：ssh -i ~/.ssh/id_rsa user@gpu3.example -p 22
 
 The hover adds **当前机器**, **40901**, **40902**, etc. as clickable selections; a check marks the active one. A short SSH login check runs when the list loads, up to two at a time; unsuccessful entries show **40901(不能连接)**. Selecting an entry retries it and clears the label on recovery. Selecting a server replaces both CPU and GPU data, closes the previous SSH sampling connection and starts two-second monitoring on the selected host. Full CPU/GPU readings are queried for the selected machine. **当前机器** returns to the current extension host.
 
-The list reloads on file creation, save or deletion; **Agent Center: Reload GPU Server List** also rereads it. Multi-root workspaces use the active editor's workspace folder, falling back to the first folder. Removing the selected entry returns to the current machine. `-p`, `-i` and `-l` are supported; arbitrary SSH flags and trailing commands are rejected. Remote monitoring uses `nvidia-smi` on the server's PATH and Linux `/proc/stat`. Relative key paths resolve from the workspace root; `~/` and the SSH agent/default keys refer to the extension host running Agent Center. Passwords stay in the source file and connection memory, never command links or diagnostics. First connections pin the SSH host-key fingerprint in extension storage; subsequent connections reject a changed key. Keep the server file private if it contains passwords.
+The list reloads on file creation, save or deletion. Click **重读服务器列表** beside the server selections, or run **Agent Center: Reload GPU Server List**, to reread the file and recheck all connections even when its contents are unchanged. Use this after edits on shared storage if automatic change notifications were missed; no full-window reload is needed. Multi-root workspaces use the active editor's workspace folder, falling back to the first folder. Removing the selected entry returns to the current machine. `-p`, `-i` and `-l` are supported; arbitrary SSH flags and trailing commands are rejected. Remote monitoring uses `nvidia-smi` on the server's PATH and Linux `/proc/stat`. Relative key paths resolve from the workspace root; `~/` and the SSH agent/default keys refer to the extension host running Agent Center. Passwords stay in the source file and connection memory, never command links or diagnostics. First connections pin the SSH host-key fingerprint in extension storage; subsequent connections reject a changed key. Keep the server file private if it contains passwords.
 
 Requires **VS Code 1.106+**. The monitor uses VS Code's wider native code-hover layout instead of the narrower rich-text layout, while keeping the GPU table's columns preformatted. Window size and font settings still constrain available space. Sampled output is HTML-escaped; only monitor, server-selection and settings commands are trusted. Sampling output is not persisted.
 
@@ -296,6 +296,18 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.46 - 2026-10-28
+
+- Add a persistent **重读服务器列表** action next to GPU server selections to reread the workspace server file and retry connectivity checks.
+
+### 0.1.45 - 2026-10-27
+
+- Increase nvidia-smi timeout to 30 seconds (32 seconds for SSH sampling) for slower multi-GPU hosts; remove the stale loading hint after failures.
+
+### 0.1.44 - 2026-10-26
+
+- Render the GPU server failure marker `(不能连接)` in red, preserving clickable retry and automatic removal after recovery.
 
 ### 0.1.43 - 2026-10-26
 

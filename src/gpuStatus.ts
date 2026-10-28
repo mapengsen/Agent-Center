@@ -197,15 +197,20 @@ export class GpuStatusMonitor implements vscode.Disposable {
   private render(): void {
     if (!this.active(this.generation)) { if (!this.disposed) this.bar.hide(); return; }
     const lines: string[] = [];
-    if (this.catalog?.servers.length) {
-      const button = (id: string, name: string) => {
-        const label = commandLink("[ " + name + " ]", "agentStatus.selectGpuServer", [id]);
+    if (this.catalog) {
+      const button = (id: string, name: string, unreachable = false) => {
+        const status = unreachable ? '<span style="color:#f14c4c;">(不能连接)</span>' : "";
+        // Keep only the fixed failure marker as HTML; escape server names and
+        // encode the opaque ID so the whole label remains a safe retry link.
+        const label = "[\\[ " + escapeMarkdown(name) + status + " \\]](command:agentStatus.selectGpuServer?" +
+          encodeURIComponent(JSON.stringify([id])) + ")";
         return (this.selected?.id ?? "local") === id ? "**✓ " + label + "**" : label;
       };
       lines.push([button("local", "当前机器"), ...this.catalog.servers.map(server =>
-        button(server.id, server.name + (this.connections.get(server.id)?.ok === false ? "(不能连接)" : "")))].join("　"));
+        button(server.id, server.name, this.connections.get(server.id)?.ok === false)),
+        commandLink("重读服务器列表", "agentStatus.reloadGpuServers")].join("　"));
     }
-    if (this.catalog?.detail) lines.push(escapeMarkdown(this.catalog.detail) + " · " + commandLink("重新读取", "agentStatus.reloadGpuServers"));
+    if (this.catalog?.detail) lines.push(escapeMarkdown(this.catalog.detail));
     const cpu = this.cpu;
     if (cpu?.state === "ready" && [cpu.totalPercent, cpu.coresUsed, cpu.machinePercent, cpu.logicalCores].every(Number.isFinite)) {
       lines.push('<h3><code>CPU 总占用：<span style="color:#007acc;">' + cpu.totalPercent!.toFixed(1) + "%</span></code></h3>",
@@ -229,7 +234,7 @@ export class GpuStatusMonitor implements vscode.Disposable {
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       if (escaped) lines.push("<pre><code>" + escaped + "</code></pre>");
       if (this.result.output.length > text.length) lines.push("输出过长，仅显示前 64000 个字符。");
-    } else if (this.watching) lines.push("正在读取 nvidia-smi…");
+    } else if (this.watching && !this.result) lines.push("正在读取 nvidia-smi…");
     const tooltip = new vscode.MarkdownString(lines.join("\n\n"));
     tooltip.supportHtml = true;
     tooltip.isTrusted = { enabledCommands: ["agentStatus.showGpuMonitor", "agentStatus.pauseGpuMonitor", "agentStatus.refreshGpuMonitor", "agentStatus.openSettings",

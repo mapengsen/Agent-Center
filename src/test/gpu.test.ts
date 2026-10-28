@@ -233,6 +233,7 @@ test("GPU failures pause with CPU data retained, and CPU failures do not stop he
   h.monitor.start(); await flush();
   assert.equal(h.timers.size, 0); assert.equal(h.monitor.getDiagnostics().watching, false);
   assert.match(h.tooltip(), /NVML/); assert.match(h.tooltip(), /CPU 总占用：<span style="color:#007acc;">1600.0%<\/span>/);
+  assert.doesNotMatch(h.tooltip(), /正在读取 nvidia-smi/);
   assert.doesNotMatch(JSON.stringify(h.monitor.getDiagnostics()), /NVML/);
   h.setProbe(async () => ({ ok: true, output: "healthy", detail: "采样成功" }));
   h.setCpuProbe(async () => { throw new Error("CPU source unavailable"); });
@@ -268,6 +269,7 @@ test("server buttons contain opaque IDs only; selecting switches both CPU/GPU an
   const h = await monitorHarness(t, true);
   h.monitor.start(); await flush();
   assert.match(h.tooltip(), /40901/); assert.match(h.tooltip(), /h20\\\*8/); assert.match(h.tooltip(), /当前机器/);
+  assert.match(h.tooltip(), /\[重读服务器列表\]\(command:agentStatus.reloadGpuServers\)/);
   assert.doesNotMatch(h.tooltip(), /private-server-password|test-host/);
   h.monitor.selectServer("server1"); await flush();
   assert.match(h.tooltip(), /GPU of 40901/); assert.match(h.tooltip(), /200.0%/);
@@ -313,11 +315,19 @@ test("failed login checks mark server names and a successful retry clears the ma
   const h = await monitorHarness(t, true);
   h.setCheck(async server => server.id !== "server1");
   h.monitor.start(); await h.monitor.reloadServers(); await flush();
-  assert.ok(h.tooltip().includes("40901\\(不能连接\\)"));
-  assert.ok(!h.tooltip().includes("h20\\*8\\(不能连接\\)"));
+  assert.ok(h.tooltip().includes('40901<span style="color:#f14c4c;">(不能连接)</span>'));
+  assert.ok(!h.tooltip().includes('h20\\*8<span style="color:#f14c4c;">(不能连接)</span>'));
+  assert.equal(h.monitor.getDiagnostics().unreachableServers, 1);
+  // Explicit reload must retry even when the catalog reports no file changes.
+  h.setCheck(async () => true);
+  await h.monitor.reloadServers();
+  assert.equal(h.monitor.getDiagnostics().unreachableServers, 0);
+  assert.doesNotMatch(h.tooltip(), /不能连接/);
+  h.setCheck(async server => server.id !== "server1");
+  await h.monitor.reloadServers();
   assert.equal(h.monitor.getDiagnostics().unreachableServers, 1);
   h.monitor.selectServer("server1"); await flush();
-  assert.ok(!h.tooltip().includes("40901\\(不能连接\\)"));
+  assert.ok(!h.tooltip().includes('40901<span style="color:#f14c4c;">(不能连接)</span>'));
   assert.equal(h.monitor.getDiagnostics().unreachableServers, 0);
   h.setRemoteProbe(async () => ({ gpu: { ok: false, output: "", detail: "未找到 nvidia-smi" }, cpu: { state: "unavailable", logicalCores: 0 }, connected: true }));
   await h.monitor.refresh();
@@ -334,8 +344,8 @@ test("login checks are limited to two at a time; an older failure cannot overrid
   finishes.get("server1")!(false); await flush();
   assert.equal(h.probeCalls.length, 3);
   finishes.get("server2")!(false); finishes.get("server3")!(true); await pending;
-  assert.ok(!h.tooltip().includes("40901\\(不能连接\\)"));
-  assert.ok(h.tooltip().includes("h20\\*8\\(不能连接\\)"));
+  assert.ok(!h.tooltip().includes('40901<span style="color:#f14c4c;">(不能连接)</span>'));
+  assert.ok(h.tooltip().includes('h20\\*8<span style="color:#f14c4c;">(不能连接)</span>'));
   h.monitor.dispose();
   assert.equal(h.monitor.getDiagnostics().watching, false);
 });

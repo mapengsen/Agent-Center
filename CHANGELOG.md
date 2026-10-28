@@ -1,5 +1,26 @@
 # Changelog / 更新日志
 
+## 0.1.46 - 2026-10-28
+
+### Added / 新增
+
+- Add a persistent reload-server-list link beside GPU server selections. Reread 可用服务器.md and recheck connections even when file contents are unchanged or a shared-storage edit was not detected automatically.
+- 在 GPU 服务器选择行增加常驻的“重读服务器列表”入口。点击重新读取可用服务器.md 并检查连接，即使文件内容未变化或共享存储修改未触发自动通知，也可更新连接标记。
+
+## 0.1.45 - 2026-10-27
+
+### Fixed / 修复
+
+- Allow 30 seconds for local nvidia-smi and 32 seconds for SSH sampling so slower multi-GPU hosts can return the full table. Preserve cancellation and non-overlapping reads; remove the loading hint after an empty failed sample.
+- 当前机器的 nvidia-smi 等待上限改为 30 秒，SSH 采样改为 32 秒，兼容完整表格读取较慢的多 GPU 主机。保留取消和防并发机制，修复失败且无输出时仍显示正在读取的提示。
+
+## 0.1.44 - 2026-10-26
+
+### Changed / 调整
+
+- Show the GPU server failure marker (不能连接) in red while keeping the complete server button clickable for retry. Clear the marker after recovery.
+- GPU 服务器的 (不能连接) 标记改为红色，保留整个服务器按钮的点击重试功能；恢复连接后清除标记。
+
 ## 0.1.43 - 2026-10-26
 
 ### Changed / 调整

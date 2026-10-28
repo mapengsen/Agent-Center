@@ -3,6 +3,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 export interface NvidiaSmiResult { ok: boolean; output: string; detail: string }
+// Full NVML tables on large GPU hosts can legitimately take several seconds.
+export const NVIDIA_SMI_TIMEOUT_MS = 30000;
 const MAX_BYTES = 1024 * 1024;
 
 /** Run a single read-only sample without a shell or a persistent `watch` process. */
@@ -38,14 +40,14 @@ async function sample(executable: string, signal?: AbortSignal): Promise<NvidiaS
     child.once("error", (error: NodeJS.ErrnoException) => { failure = error; });
     const abort = () => { child.kill("SIGKILL"); };
     signal?.addEventListener("abort", abort, { once: true });
-    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, 5000);
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, NVIDIA_SMI_TIMEOUT_MS);
     // Wait for close, including after cancellation, so refreshes never overlap children.
     child.once("close", (code) => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abort);
       if (signal?.aborted) return resolve({ ok: false, output: "", detail: "已暂停" });
       if (failure?.code === "ENOENT") return resolve({ ok: false, output: "", detail: "未找到 nvidia-smi", missing: true });
-      if (timedOut) return resolve({ ok: false, output: "", detail: "nvidia-smi 执行超时（5 秒），监控已暂停。" });
+      if (timedOut) return resolve({ ok: false, output: "", detail: "nvidia-smi 执行超时（" + NVIDIA_SMI_TIMEOUT_MS / 1000 + " 秒），监控已暂停。" });
       if (tooLarge) return resolve({ ok: false, output: "", detail: "nvidia-smi 输出超过 1 MiB，监控已暂停。" });
       const output = [cleanOutput(Buffer.concat(stdout).toString("utf8")), cleanOutput(Buffer.concat(stderr).toString("utf8"))].filter(Boolean).join("\n");
       const ok = !failure && code === 0 && Boolean(output);

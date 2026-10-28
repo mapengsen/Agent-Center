@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { cpuUsageBetween, type CpuSnapshot, type CpuUsage } from "./cpuUsage";
 import { gpuServerSignature, type GpuServer } from "./gpuServerConfig";
-import type { NvidiaSmiResult } from "./nvidiaSmi";
+import { NVIDIA_SMI_TIMEOUT_MS, type NvidiaSmiResult } from "./nvidiaSmi";
 
 export interface RemoteGpuSample { gpu: NvidiaSmiResult; cpu: CpuUsage; connected?: boolean }
 export interface GpuServerProbe { check(server: GpuServer, signal?: AbortSignal): Promise<boolean>; dispose(): void }
@@ -173,7 +173,8 @@ export class SshGpuReader implements RemoteGpuReader {
       const fail = (detail: string) => { if (settled) return; settled = true; cleanup(); channel?.destroy(); client.destroy(); reject(new SafeGpuError(detail)); };
       const abort = () => fail("已暂停");
       const closed = () => fail("SSH 连接已关闭。");
-      const timer = setTimeout(() => fail("远程采样超时（7 秒），监控已暂停。"), 7000);
+      const timeout = NVIDIA_SMI_TIMEOUT_MS + 2000;
+      const timer = setTimeout(() => fail("远程采样超时（" + timeout / 1000 + " 秒），监控已暂停。"), timeout);
       signal?.addEventListener("abort", abort, { once: true }); client.once("close", closed);
       if (signal?.aborted) { abort(); return; }
       client.exec(command, (error, stream) => {
