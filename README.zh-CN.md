@@ -17,6 +17,7 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | Claude 使用额度 | 查看接口返回的 5 小时、7 天、Opus、Sonnet 额度窗口，以及订阅和重置时间。 |
 | 额度显示与刷新 | 为两个服务分别选择剩余/已使用模式，用彩色标记查看使用程度；支持点击刷新、定时刷新和失败重试。 |
 | GPU/CPU 实时监控 | 悬停 GPU 展示原生浮动卡片，移开隐藏；读取当前工作区根目录的 `可用服务器.md`，点击服务器名称切换 CPU/GPU 状态，每 2 秒更新当前选中的机器，保留暂停、继续和单次刷新。 |
+| 文件监视诊断 | 启动时对工作区做一次文件事件自检。未收到事件时在状态栏提示，悬停可查看当前连接的相关报错或重新加载窗口。 |
 | VS Code 联网检测 | 从扩展宿主只访问 Google 公开网页；收到任意 HTTP 响应显示 `✅️`，无响应显示 `❌`。图标放在 Clash 地球图标前，启动时检测一次，之后默认每 **5 小时**一次，也可手动检测。 |
 | Clash 当前节点与延迟 | 查看 Google 延迟、最终节点、完整选择链和路由模式。自动读取 Clash/Mihomo 控制器配置，识别 Linux/WSL 自定义安装目录；默认每 **5 分钟**测速一次。 |
 | 一键切换 Clash 节点 | 在右下角悬浮卡片点击节点，或打开完整节点列表搜索选择；切换后校验选择并重新测速。 |
@@ -45,10 +46,17 @@ Agent Center 将 Codex / Claude 使用额度、Codex 服务商切换与历史共
 | Clash 节点 → Google | 启动时测速，之后每 **5 分钟**一次；切换节点或订阅后也会测速，更新订阅成功后追加全部节点并行测速。 | 悬浮卡片中的“刷新测速”。 |
 | 当前订阅 DNS 缓存 | 首次识别安装时缓存，之后每 **5 天**更新；VS Code 关闭期间不运行，重新连接后检查并补更。下载失败保留旧缓存，后台最多每小时重试一次。 | “DNS 使用订阅配置”始终先尝试下载最新值，失败再用缓存。 |
 | GPU/CPU 监控 | 启动时采样，每轮读取结束 **2 秒**后再读取，不并发。隐藏卡片后继续后台监控，可手动暂停。 | 原生悬浮卡片中的暂停、继续及单次刷新链接。 |
+| 文件监视诊断 | 启动约 **90 秒**后检查一次。 | 异常卡片中的“重新加载窗口”。 |
 
 ![Agent Center 状态栏预览](image.png)
 
 上图展示额度状态项。联网与 Clash 合并显示的示例为 `✅️ 🌐 √ Google（1605 ms）`：最前面的图标表示扩展宿主检测结果，后面的延迟来自独立的 Clash 节点测速。
+
+## 文件监视诊断
+
+Agent Center 启动约 90 秒后，在每个工作区根目录创建一次临时文件，最多等待 5 秒，看 VS Code 能否收到创建事件。结束后清理探针文件和事件订阅。根目录不可写时，诊断会显示该目录无法自检。
+
+只有自检未收到事件时才显示 **文件监视异常** 并查日志。远程窗口只查看最新扩展宿主连接记录之后、与探针失败的工作区根目录匹配的报错。悬停可查看详情，点击 **重新加载窗口** 可重建监视。**Agent Center: Show Diagnostics** 的 `fileWatcher` 字段列出自检结果。可通过 `agentStatus.fileWatcher.enabled` 关闭检测。
 
 ## GPU/CPU 实时监控
 
@@ -262,6 +270,7 @@ Agent Center 只读取当前窗口原有 `Codex.log` 的新增内容，启动时
 | 设置分组 | 启用/关闭 | 其他选项 |
 | --- | --- | --- |
 | GPU/CPU 监控 | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
+| 文件监视诊断 | `agentStatus.fileWatcher.enabled` | — |
 | Codex 服务商切换 | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex 额度 | `agentStatus.codex.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
 | Claude 额度 | `agentStatus.claude.enabled` | `credentialsPath`、`usageDisplayMode`、`usageUpdateIntervalSeconds`、`proxyUrl` |
@@ -296,6 +305,18 @@ npm run package
 ## 更新日志
 
 各版本完整变更见[完整更新日志](CHANGELOG.md)。
+
+### 0.1.49 - 2026-11-14
+
+- 以一次性文件事件自检判断监视状态，异常原因仅参考当前连接和对应工作区的日志。
+
+### 0.1.48 - 2026-11-14
+
+- 改为启动约 90 秒后只检查一次文件监视日志。
+
+### 0.1.47 - 2026-11-14
+
+- 状态栏提示当前工作区的递归文件监视报错，悬停可查看原因和重新加载窗口。
 
 ### 0.1.46 - 2026-10-28
 

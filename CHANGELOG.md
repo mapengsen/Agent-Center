@@ -1,5 +1,26 @@
 # Changelog / 更新日志
 
+## 0.1.49 - 2026-11-14
+
+### Fixed / 修复
+
+- Verify existing workspace file events with a one-time probe. Read watcher errors only when the probe misses an event, scoped to the connection and affected workspace.
+- 用一次性探针验证工作区文件事件，仅在未收到事件时查找当前连接和对应工作区的报错。
+
+## 0.1.48 - 2026-11-14
+
+### Changed / 调整
+
+- Run a single bounded file watcher log check 90 seconds after startup.
+- 启动约 90 秒后只检查一次文件监视日志，给大型工作区留出监视注册时间。
+
+## 0.1.47 - 2026-11-14
+
+### Added / 新增
+
+- Detect recursive file watcher failures for the current workspace. Show the reported path and reason in a status-bar hover with a window reload action.
+- 检测当前工作区的递归文件监视报错，在状态栏悬停卡片显示失败路径和原因，并提供重新加载窗口的入口。
+
 ## 0.1.46 - 2026-10-28
 
 ### Added / 新增

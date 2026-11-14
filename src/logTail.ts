@@ -1,8 +1,9 @@
 import * as fs from "node:fs/promises";
 import type { Stats } from "node:fs";
+import { basename } from "node:path";
 
 export class LogTail {
-  public status: "initializing" | "watching" | "waiting for Codex.log" = "initializing";
+  public status: "initializing" | "watching" | `waiting for ${string}` = "initializing";
   private offset = 0;
   private identity: string | undefined;
   private partial: Buffer = Buffer.alloc(0);
@@ -15,23 +16,23 @@ export class LogTail {
     return `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`;
   }
 
-  public async prime(): Promise<void> {
+  public async prime(lookbackBytes = 0): Promise<void> {
     let file: fs.FileHandle | undefined;
     try {
       file = await fs.open(this.filename, "r");
       const stat = await file.stat();
-      if (!stat.isFile()) throw new Error("Codex log is not a regular file");
-      this.offset = stat.size; // Never replay old failures on activation/restart.
+      if (!stat.isFile()) throw new Error("Log is not a regular file");
+      this.offset = Math.max(0, stat.size - lookbackBytes);
       this.identity = this.identityOf(stat);
-      if (stat.size) {
+      if (this.offset) {
         const last = Buffer.alloc(1);
-        await file.read(last, 0, 1, stat.size - 1);
+        await file.read(last, 0, 1, this.offset - 1);
         this.discardLine = last[0] !== 10;
       }
       this.status = "watching";
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      this.status = "waiting for Codex.log";
+      this.status = `waiting for ${basename(this.filename)}`;
     } finally {
       await file?.close();
     }
@@ -64,7 +65,7 @@ export class LogTail {
     try {
       file = await fs.open(this.filename, "r");
       const stat = await file.stat();
-      if (!stat.isFile()) throw new Error("Codex log is not a regular file");
+      if (!stat.isFile()) throw new Error("Log is not a regular file");
       const identity = this.identityOf(stat);
       if (identity !== this.identity || stat.size < this.offset) {
         this.offset = 0;
@@ -82,7 +83,7 @@ export class LogTail {
       return this.consume(buffer.subarray(0, bytesRead));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      this.status = "waiting for Codex.log";
+      this.status = `waiting for ${basename(this.filename)}`;
       return [];
     } finally {
       try { await file?.close(); } finally { this.busy = false; }

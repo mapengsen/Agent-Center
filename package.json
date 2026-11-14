@@ -1,8 +1,8 @@
 {
   "name": "codex-claude-agent-status",
   "displayName": "Agent Center",
-  "description": "Codex/Claude quotas, provider switching, multi-server GPU/CPU monitoring, Google connectivity, Clash controls and file-link recovery.",
-  "version": "0.1.46",
+  "description": "Codex/Claude quotas, provider switching, GPU/CPU monitoring, Google connectivity, Clash controls, file-link recovery and file watcher diagnostics.",
+  "version": "0.1.49",
   "publisher": "pengsen",
   "license": "MIT",
   "icon": "resources/images/agent-center.png",
@@ -161,6 +161,11 @@
     "configuration": {
       "title": "Agent Center",
       "properties": {
+        "agentStatus.fileWatcher.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启动约 90 秒后，在每个工作区根目录做一次临时文件变更自检。只有未收到事件时才查日志，并提供重新加载窗口的入口。"
+        },
         "agentStatus.gpu.enabled": {
           "type": "boolean",
           "default": true,
@@ -387,7 +392,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js out/test/clashNodeTests.test.js out/test/clashBestNode.test.js out/test/gpu.test.js out/test/cpu.test.js out/test/gpuServers.test.js out/test/gpuServerCatalog.test.js",
+    "test:unit": "npm run compile && node --test out/test/core.test.js out/test/codexImageLinks.test.js out/test/codeCli.test.js out/test/textEditorLinks.test.js out/test/clash.test.js out/test/clashDiscovery.test.js out/test/clashSubscriptions.test.js out/test/clashControl.test.js out/test/network.test.js out/test/codexProvider.test.js out/test/clashDns.test.js out/test/clashNodeTests.test.js out/test/clashBestNode.test.js out/test/gpu.test.js out/test/cpu.test.js out/test/gpuServers.test.js out/test/gpuServerCatalog.test.js out/test/fileWatcher.test.js",
     "vscode:prepublish": "npm run compile",
     "package": "npm run compile && vsce package"
   },

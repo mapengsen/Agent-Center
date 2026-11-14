@@ -17,6 +17,7 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Claude usage quotas | Inspect 5-hour, 7-day, Opus and Sonnet windows when returned by the service, plus subscription and reset details. |
 | Quota display and refresh | Choose remaining/used mode for each provider, see colored usage markers, click to refresh, and use automatic refresh with failure retries. |
 | Live GPU/CPU monitor | Hover over GPU for a native floating card; move away to hide it. Read `可用服务器.md` from the current workspace root and click a server name to switch CPU/GPU monitoring. Refresh the selected machine every two seconds, with pause/resume and single refresh. |
+| File watcher diagnostics | Probe the existing workspace watcher once at startup. If it misses the test event, see a status-bar warning with any matching current-session error and a reload action. |
 | VS Code internet connectivity | Request only Google's public website from the extension host. Any HTTP response shows `✅️`; no response shows `❌`. The single icon sits before the Clash globe. Checks run at startup and every **5 hours**, with manual checks available. |
 | Clash node and latency | See Google latency, the final active node, nested selection chain and routing mode. Read controller settings automatically from Clash/Mihomo, including custom Linux/WSL installations. Default test interval: **5 minutes**. |
 | Switch Clash nodes | Click a node in the bottom-right hover card or search the full node list. Verify the selection and test latency after switching. |
@@ -45,10 +46,17 @@ Agent Center puts Codex and Claude usage quotas, Codex provider switching with s
 | Clash node → Google | At startup, then every **5 minutes**; also after node or subscription switches. Successful subscription updates additionally test all loaded nodes in parallel. | Choose “刷新测速” in the hover card. |
 | Current subscription DNS cache | Cache on discovery, then refresh every **5 days**, checking overdue work after reconnecting. Failed downloads retain prior data and retry at most hourly. Requires the extension to be running. | “DNS 使用订阅配置” always tries a fresh download before falling back to cache. |
 | GPU/CPU monitor | Sample at startup, then **2 seconds after each completed read**, without overlap. Hidden cards keep sampling until paused. | Pause/resume and single-refresh links in the native hover. |
+| File watcher diagnostics | Check once, about **90 seconds** after startup. | Reload the window from the warning hover. |
 
 ![Agent Center status bar preview](image.png)
 
 The image shows the quota items. A combined connectivity and Clash example is `✅️ 🌐 √ Google（1605 ms）`: the leading icon is the extension-host check, and the latency is the independent Clash node test.
+
+## File watcher diagnostics
+
+Agent Center waits about 90 seconds after startup, creates a temporary file in each workspace root, and waits up to five seconds for VS Code to report its creation. It removes the temporary files and event listener when finished. An unwritable root is reported as unavailable in diagnostics.
+
+Only a missed event triggers a warning and a bounded log read. For Remote SSH, WSL and Dev Containers, the diagnostic looks after the latest extension-host connection record and matches only affected workspace roots. Hover over **文件监视异常** for details, or select **重新加载窗口** to rebuild the watcher. **Agent Center: Show Diagnostics** lists the probe results under `fileWatcher`. Disable the check with `agentStatus.fileWatcher.enabled`.
 
 ## Live GPU/CPU monitoring
 
@@ -262,6 +270,7 @@ Search for **Agent Center** in Settings, or run **Agent Center: Open Settings**.
 | Settings group | Enable/disable | Other options |
 | --- | --- | --- |
 | GPU/CPU monitor | `agentStatus.gpu.enabled` | `nvidiaSmiPath` |
+| File watcher diagnostics | `agentStatus.fileWatcher.enabled` | — |
 | Codex provider switching | `agentStatus.codexProvider.enabled` | `pythonPath` |
 | Codex quota | `agentStatus.codex.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
 | Claude quota | `agentStatus.claude.enabled` | `credentialsPath`, `usageDisplayMode`, `usageUpdateIntervalSeconds`, `proxyUrl` |
@@ -296,6 +305,18 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 ## Changelog
 
 See [the complete changelog](CHANGELOG.md) for every release.
+
+### 0.1.49 - 2026-11-14
+
+- Use a one-time file event probe to detect watcher failures and scope diagnostic logs to the current connection and affected workspace.
+
+### 0.1.48 - 2026-11-14
+
+- Check file watcher logs once, about 90 seconds after startup.
+
+### 0.1.47 - 2026-11-14
+
+- Show recursive file watcher failures for the current workspace in the status bar, with a window reload action.
 
 ### 0.1.46 - 2026-10-28
 
