@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.50 - 2026-11-15
+
+### Changed / 调整
+
+- Retry missed file watcher events during startup at increasing intervals, then stop on success or after five retries. Reserve the warning for matching errors from the current connection.
+- 启动期间逐步延长文件事件复测间隔，验证通过或复测五次后停止。只有当前连接记录了匹配的报错时才显示异常提醒。
+
 ## 0.1.49 - 2026-11-14
 
 ### Fixed / 修复

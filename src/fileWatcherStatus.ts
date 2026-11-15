@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
 import { commandLink } from "./clashPresentation";
-import { findFileWatcherFailure, resolveFileWatcherLog, type FileWatcherFailure } from "./fileWatcherLog";
+import { fileWatcherPathKey, findFileWatcherFailure, resolveFileWatcherLog, type FileWatcherFailure } from "./fileWatcherLog";
 import { probeFileWatchers, type FileWatcherProbeResult } from "./fileWatcherProbe";
 
 // Remote workspaces on shared storage can need over a minute to register watches.
 const STARTUP_DELAY_MS = 90_000;
+const RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 240_000, 480_000] as const;
 const RELOAD_COMMAND = "agentStatus.reloadWindowForFileWatcher";
 
 export class FileWatcherStatusMonitor implements vscode.Disposable {
@@ -21,9 +22,7 @@ export class FileWatcherStatusMonitor implements vscode.Disposable {
   private disposed = false;
 
   public constructor(private readonly context: vscode.ExtensionContext) {
-    this.bar.name = "Agent Center · 文件监视异常";
-    this.bar.text = "$(warning) 文件监视异常";
-    this.bar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+    this.bar.name = "Agent Center · 文件监视";
     this.bar.command = "workbench.action.showHover";
   }
 
@@ -46,10 +45,10 @@ export class FileWatcherStatusMonitor implements vscode.Disposable {
       return;
     }
     this.status = "waiting for startup check";
-    this.timer = setTimeout(() => this.check(generation), STARTUP_DELAY_MS).unref();
+    this.timer = setTimeout(() => this.check(generation, 0), STARTUP_DELAY_MS).unref();
   }
 
-  private async check(generation: number): Promise<void> {
+  private async check(generation: number, attempt: number): Promise<void> {
     if (generation !== this.generation) return;
     this.timer = undefined;
     const remote = Boolean(vscode.env.remoteName);
@@ -58,24 +57,39 @@ export class FileWatcherStatusMonitor implements vscode.Disposable {
       .map(({ uri }) => uri);
     if (!roots.length) {
       this.status = "no disk workspace";
+      this.bar.hide();
       return;
     }
+    const rootKeys = new Set(roots.map(root => fileWatcherPathKey(root.fsPath)));
+    const retained = this.results.filter(result => result.status !== "no event" && rootKeys.has(fileWatcherPathKey(result.root)));
+    const checked = new Set(retained.map(result => fileWatcherPathKey(result.root)));
+    const remaining = roots.filter(root => !checked.has(fileWatcherPathKey(root.fsPath)));
     const abort = new AbortController();
     this.abort = abort;
     this.status = "running file watcher probe";
     try {
-      const results = await probeFileWatchers(roots, abort.signal);
+      const results = remaining.length ? await probeFileWatchers(remaining, abort.signal) : [];
       if (generation !== this.generation) return;
-      this.results = results;
+      this.results = [...retained, ...results];
       const failed = results.filter(result => result.status === "no event").map(result => result.root);
       if (!failed.length) {
-        this.status = results.every(result => result.status === "passed") ? "passed" : "probe unavailable";
+        this.status = this.results.every(result => result.status === "passed") ? "passed" : "probe unavailable";
+        this.logFile = this.logStatus = undefined;
+        this.failure = undefined;
+        this.bar.hide();
         return;
       }
-      this.status = "no file event received";
       await this.explainFailure(failed, remote, generation);
+      if (generation !== this.generation) return;
+      const nextDelay = RETRY_DELAYS_MS[attempt];
+      this.status = this.failure ? "watcher error reported" : nextDelay ? "waiting for file events" : "file events unconfirmed";
+      this.show(failed, nextDelay);
+      if (nextDelay) this.timer = setTimeout(() => this.check(generation, attempt + 1), nextDelay).unref();
     } catch {
-      if (generation === this.generation) this.status = "probe unavailable";
+      if (generation === this.generation) {
+        this.status = "probe unavailable";
+        this.bar.hide();
+      }
     } finally {
       if (this.abort === abort) this.abort = undefined;
     }
@@ -95,7 +109,6 @@ export class FileWatcherStatusMonitor implements vscode.Disposable {
     if (generation !== this.generation) return;
     this.failure = failure;
     this.logStatus = failure ? "matching error found" : logStatus;
-    this.show(failed, failure);
   }
 
   public getDiagnostics(): object {
@@ -111,8 +124,13 @@ export class FileWatcherStatusMonitor implements vscode.Disposable {
     this.bar.dispose();
   }
 
-  private show(failed: readonly string[], failure: FileWatcherFailure | undefined): void {
-    const tooltip = new vscode.MarkdownString("**VS Code 文件监视异常**\n\n");
+  private show(failed: readonly string[], nextDelay: number | undefined): void {
+    const failure = this.failure;
+    const label = failure ? "文件监视异常" : nextDelay ? "等待文件监视" : "文件监视未确认";
+    const icon = failure ? "warning" : nextDelay ? "clock" : "info";
+    this.bar.text = `$(${icon}) ${label}`;
+    this.bar.backgroundColor = failure ? new vscode.ThemeColor("statusBarItem.warningBackground") : undefined;
+    const tooltip = new vscode.MarkdownString(`**VS Code ${label}**\n\n`);
     tooltip.appendText("工作区自检未收到文件变更事件。");
     for (const root of failed) tooltip.appendMarkdown("\n\n").appendText(root);
     if (failure) {
@@ -120,17 +138,21 @@ export class FileWatcherStatusMonitor implements vscode.Disposable {
       if (failure.failedPath) tooltip.appendMarkdown("\n\n").appendText(`失败路径：${failure.failedPath}`);
       tooltip.appendMarkdown("\n\n").appendText(`原因：${failure.reason}`);
       tooltip.appendMarkdown("\n\n").appendText(`日志时间：${new Date(failure.timestamp).toLocaleString()}`);
-    } else {
-      tooltip.appendMarkdown("\n\n").appendText("当前连接中没有可用于定位原因的日志。");
+      tooltip.appendMarkdown("\n\n" + commandLink("重新加载窗口", RELOAD_COMMAND));
+      tooltip.isTrusted = { enabledCommands: [RELOAD_COMMAND] };
     }
-    tooltip.appendMarkdown("\n\n磁盘上的修改可能暂时无法同步到编辑器。\n\n" + commandLink("重新加载窗口", RELOAD_COMMAND));
-    tooltip.isTrusted = { enabledCommands: [RELOAD_COMMAND] };
+    if (nextDelay) {
+      const delay = nextDelay < 60_000 ? `${nextDelay / 1000} 秒` : `${nextDelay / 60_000} 分钟`;
+      tooltip.appendMarkdown("\n\n").appendText(`VS Code 可能仍在建立监视。约 ${delay}后复测。`);
+    } else if (!failure) {
+      tooltip.appendMarkdown("\n\n").appendText("启动自检已结束，仍未收到文件事件。当前连接中没有可用于定位原因的日志。");
+    }
     this.bar.tooltip = tooltip;
     this.bar.show();
   }
 
   private async reloadWindow(): Promise<void> {
-    if (this.status !== "no file event received") return;
+    if (!this.failure) return;
     await vscode.commands.executeCommand("workbench.action.reloadWindow");
   }
 }

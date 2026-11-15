@@ -99,19 +99,22 @@ test("probe subscribes to existing workspace events and removes its temporary fi
   assert.equal(disposed, 4);
 });
 
-test("startup checks once and reads logs only when the workspace probe receives no event", async t => {
+test("startup uses bounded backoff, retries unresolved roots and clears warnings when events arrive", async t => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "agent-center-watcher-test-"));
   t.after(() => fs.rm(temporary, { recursive: true, force: true }));
   const workspace = path.join(temporary, "workspace");
+  const other = path.join(temporary, "other");
   const log = path.join(temporary, "remoteagent.log");
   await fs.writeFile(log, failure(workspace) + connection);
 
   let visible = false;
   let enabled = true;
-  let pendingCheck: (() => Promise<void>) | undefined;
+  let pendingCheck: { check: () => Promise<void>; delay: number } | undefined;
   let reload: () => Promise<void>;
   const invoked: string[] = [];
   let logReads = 0;
+  const testedRoots: string[][] = [];
+  const bar = { text: "", show() { visible = true; }, hide() { visible = false; }, dispose() {} };
   let probeStatus: Awaited<ReturnType<typeof probeFileWatchers>>[number]["status"] = "passed";
   const entry = require.resolve("../fileWatcherStatus");
   const nativeRequire = createRequire(entry);
@@ -126,10 +129,10 @@ test("startup checks once and reads logs only when the workspace probe receives 
         public appendText() { return this; }
         public appendMarkdown() { return this; }
       },
-      window: { createStatusBarItem: () => ({ show: () => { visible = true; }, hide: () => { visible = false; }, dispose() {} }) },
+      window: { createStatusBarItem: () => bar },
       env: { remoteName: "ssh-remote" },
       workspace: {
-        workspaceFolders: [{ uri: uri(workspace) }],
+        workspaceFolders: [{ uri: uri(workspace) }, { uri: uri(other) }],
         isTrusted: true,
         getConfiguration: () => ({ get: () => enabled }),
       },
@@ -138,14 +141,17 @@ test("startup checks once and reads logs only when the workspace probe receives 
         executeCommand: async (command: string) => invoked.push(command),
       },
     } : id === "./fileWatcherProbe" ? {
-      probeFileWatchers: async () => [{ root: workspace, status: probeStatus }],
+      probeFileWatchers: async (roots: Parameters<typeof probeFileWatchers>[0]) => {
+        testedRoots.push(Array.from(roots, root => root.fsPath));
+        return roots.map(root => ({ root: root.fsPath, status: root.fsPath === workspace ? probeStatus : "passed" }));
+      },
     } : id === "./fileWatcherLog" ? {
+      fileWatcherPathKey: nativeRequire("./fileWatcherLog").fileWatcherPathKey,
       resolveFileWatcherLog,
       findFileWatcherFailure: (...args: Parameters<typeof findFileWatcherFailure>) => { logReads++; return findFileWatcherFailure(...args); },
     } : nativeRequire(id),
     setTimeout: (callback: () => Promise<void>, delay: number) => {
-      assert.equal(delay, 90_000);
-      pendingCheck = callback;
+      pendingCheck = { check: callback, delay };
       return { unref() { return this; } };
     },
     clearTimeout() { pendingCheck = undefined; },
@@ -156,42 +162,72 @@ test("startup checks once and reads logs only when the workspace probe receives 
   } as unknown as ConstructorParameters<typeof FileWatcherStatusMonitor>[0]);
   t.after(() => monitor.dispose());
 
-  const startup = async () => {
+  const runTimer = async (delay: number) => {
+    const timer = pendingCheck;
+    assert.ok(timer);
+    assert.equal(timer.delay, delay);
+    pendingCheck = undefined;
+    await timer.check();
+  };
+  const startup = () => {
     monitor.scheduleStartupCheck();
     assert.equal(visible, false);
-    const check = pendingCheck;
-    assert.ok(check);
-    pendingCheck = undefined;
-    await check();
-    assert.equal(pendingCheck, undefined, "the startup check must not schedule another read");
+    return runTimer(90_000);
   };
+  const status = () => (monitor.getDiagnostics() as { status: string }).status;
 
   await startup();
   assert.equal(visible, false);
   assert.equal(logReads, 0);
-  assert.equal((monitor.getDiagnostics() as { status: string }).status, "passed");
+  assert.equal(status(), "passed");
+  assert.equal(pendingCheck, undefined);
 
   probeStatus = "no event";
   await startup();
   assert.equal(visible, true);
+  assert.equal(status(), "waiting for file events");
+  assert.equal(bar.text, "$(clock) 等待文件监视");
   assert.equal(logReads, 1);
   assert.equal((monitor.getDiagnostics() as { failure?: unknown }).failure, undefined);
   await reload!();
-  assert.deepEqual(invoked, ["workbench.action.reloadWindow"]);
+  assert.deepEqual(invoked, []);
 
   await fs.appendFile(log, failure(workspace));
-  await startup();
+  await runTimer(30_000);
+  assert.deepEqual(testedRoots.at(-1), [workspace]);
+  assert.equal(bar.text, "$(warning) 文件监视异常");
   assert.equal((monitor.getDiagnostics() as { failure: { root: string } }).failure.root, workspace);
+  await reload!();
+  assert.deepEqual(invoked, ["workbench.action.reloadWindow"]);
+
+  probeStatus = "passed";
+  await runTimer(60_000);
+  assert.equal(visible, false);
+  assert.equal(status(), "passed");
+  assert.equal(pendingCheck, undefined);
+  assert.equal(logReads, 2);
+  assert.equal((monitor.getDiagnostics() as { failure?: unknown }).failure, undefined);
+
+  await fs.appendFile(log, connection);
+  probeStatus = "no event";
+  await startup();
+  for (const delay of [30_000, 60_000, 120_000, 240_000, 480_000]) await runTimer(delay);
+  assert.equal(status(), "file events unconfirmed");
+  assert.equal(bar.text, "$(info) 文件监视未确认");
+  assert.equal(pendingCheck, undefined);
 
   probeStatus = "unavailable";
   await startup();
   assert.equal(visible, false);
-  assert.equal(logReads, 2);
-  assert.equal((monitor.getDiagnostics() as { status: string }).status, "probe unavailable");
+  assert.equal(logReads, 8);
+  assert.equal(status(), "probe unavailable");
 
+  probeStatus = "no event";
+  await startup();
+  assert.ok(pendingCheck);
   enabled = false;
   monitor.scheduleStartupCheck();
   assert.equal(visible, false);
   assert.equal(pendingCheck, undefined);
-  assert.equal((monitor.getDiagnostics() as { status: string }).status, "disabled");
+  assert.equal(status(), "disabled");
 });
