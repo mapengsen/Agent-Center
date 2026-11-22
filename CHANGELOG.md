@@ -1,5 +1,12 @@
 # Changelog / 更新日志
 
+## 0.1.51 - 2026-11-22
+
+### Fixed / 修复
+
+- Replace dots and spaces with hyphens in generated subscription IDs so older clash-for-linux releases can read their saved URLs when switching subscriptions.
+- 自动生成订阅标识时把点号和空格转换为连字符，使旧版 clash-for-linux 切换订阅时能正确读取已保存的链接。
+
 ## 0.1.50 - 2026-11-15
 
 ### Changed / 调整

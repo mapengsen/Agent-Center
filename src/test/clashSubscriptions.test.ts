@@ -77,7 +77,7 @@ test("resolves provider titles and filenames on demand, caches them and falls ba
   assert.deepEqual(await new ClashSubscriptions(h.root).list({ resolveNames: true }), resolved);
   assert.deepEqual(await manager.list(), resolved);
   assert.deepEqual(await Promise.all(Object.values(h.data.sources).map((source) => manager.suggestName(source.url))),
-    ["我的机场", "夏洛特-linux", "iKuuu_V2", "127.0.0.1", "127.0.0.1"]);
+    ["我的机场", "夏洛特-linux", "iKuuu_V2", "127-0-0-1", "127-0-0-1"]);
   assert.equal(requests, 5, "Cached names and failures must not cause repeated requests");
 });
 
@@ -85,6 +85,7 @@ test("suggested names are safe, unique, and rechecked when saved without replaci
   const h = await fixture(t);
   const titles: Record<string, string> = {
     "/duplicate": "iKuuu_V2", "/reserved": "default", "/unsafe": "🚀 我的机场：2026?", "/long": "机场".repeat(80), "/symbols": "🚀🚀",
+    "/punctuation": "中文订阅 2026-11.22",
   };
   const api = http.createServer((req, res) => {
     res.setHeader("profile-title", "base64:" + Buffer.from(titles[req.url!] ?? "").toString("base64"));
@@ -119,6 +120,9 @@ test("suggested names are safe, unique, and rechecked when saved without replaci
   await h.save();
   assert.equal(await manager.suggestName(origin + "/reserved"), "default");
   assert.equal(await manager.suggestName(origin + "/unsafe"), "我的机场-2026");
+  const suggestedWithPunctuation = await manager.suggestName(origin + "/punctuation");
+  assert.equal(suggestedWithPunctuation, "中文订阅-2026-11-22");
+  assert.equal(await manager.add(suggestedWithPunctuation, origin + "/punctuation", { uniqueName: true }), suggestedWithPunctuation);
   const long = await manager.suggestName(origin + "/long");
   assert.equal(Array.from(long).length, 64);
   validateSubscriptionName(long);

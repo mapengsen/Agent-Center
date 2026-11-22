@@ -306,6 +306,10 @@ Packaging creates `codex-claude-agent-status-<version>.vsix`. To produce the ful
 
 See [the complete changelog](CHANGELOG.md) for every release.
 
+### 0.1.51 - 2026-11-22
+
+- Generate subscription IDs that older clash-for-linux releases can read when switching subscriptions.
+
 ### 0.1.50 - 2026-11-15
 
 - Give slow workspace watcher scans time to finish with bounded startup retries. Clear the status when file events arrive.

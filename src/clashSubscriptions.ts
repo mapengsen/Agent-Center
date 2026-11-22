@@ -237,8 +237,9 @@ function cleanTitle(text: string): string | undefined {
 }
 
 function availableSubscriptionName(title: string, existing: string[]): string {
-  const safe = title.normalize("NFKC").replace(/[^\p{L}\p{N}_. -]+/gu, "-")
-    .replace(/ +/g, " ").replace(/^[^\p{L}\p{N}]+|[ .-]+$/gu, "");
+  // Older clash-for-linux releases read these keys through an unquoted yq path.
+  const safe = title.normalize("NFKC").replace(/[^\p{L}\p{N}_-]+/gu, "-")
+    .replace(/^[^\p{L}\p{N}]+|-+$/gu, "");
   const base = Array.from(safe || "subscription").slice(0, 64).join("");
   const taken = new Set(existing);
   let name = base;
